@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme/theme';
-import { BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, RegisterScreen, SettingsScreen, TasksScreen, WelcomeScreen } from '../screens/screens';
+import { BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, RegisterScreen, SettingsScreen, TasksScreen, WeeklyPlanScreen, WelcomeScreen } from '../screens/screens';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -15,6 +15,7 @@ function MainTabs() {
       <Tabs.Screen name="Tasks" component={TasksScreen} />
       <Tabs.Screen name="Planner" component={PlannerScreen} />
       <Tabs.Screen name="Calendar" component={CalendarScreen} />
+      <Tabs.Screen name="Weekly Plan" component={WeeklyPlanScreen} />
       <Tabs.Screen name="Campaigns" component={CampaignsScreen} />
       <Tabs.Screen name="Tips" component={RecommendationsScreen} />
       <Tabs.Screen name="Settings" component={SettingsScreen} />

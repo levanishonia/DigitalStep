@@ -145,6 +145,35 @@ app.post('/businesses', requireAuth, asyncHandler<AuthedRequest>(async (req, res
   return res.status(201).json({ business });
 }));
 
+
+function dayRangeFromQuery(start?: unknown, end?: unknown) {
+  const startDate = typeof start === 'string' && start ? new Date(`${start}T00:00:00`) : undefined;
+  const endDate = typeof end === 'string' && end ? new Date(`${end}T23:59:59.999`) : undefined;
+  return { startDate, endDate };
+}
+
+function dateWhere(startDate?: Date, endDate?: Date) {
+  if (startDate && endDate) return { gte: startDate, lte: endDate };
+  if (startDate) return { gte: startDate };
+  if (endDate) return { lte: endDate };
+  return undefined;
+}
+
+function startOfWeek(date = new Date()) {
+  const next = new Date(date);
+  const day = next.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  next.setDate(next.getDate() + diff);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
 async function firstBusiness(userId: string) {
   return prisma.business.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: 'asc' } });
 }
@@ -187,7 +216,9 @@ app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) 
 app.get('/tasks', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
   const status = taskStatusSchema.optional().safeParse(req.query.status);
-  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}) };
+  const { startDate, endDate } = dayRangeFromQuery(req.query.startDate, req.query.endDate);
+  const dueDate = dateWhere(startDate, endDate);
+  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}), ...(dueDate ? { dueDate } : {}) };
   return res.json({ tasks: business ? await prisma.task.findMany({ where, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] }) : [] });
 }));
 
@@ -218,7 +249,9 @@ app.get('/content-items', requireAuth, asyncHandler<AuthedRequest>(async (req, r
   const business = await firstBusiness(req.userId!);
   const status = contentStatusSchema.optional().safeParse(req.query.status);
   const type = contentTypeSchema.optional().safeParse(req.query.type);
-  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}), ...(type.success && type.data ? { type: type.data } : {}) };
+  const { startDate, endDate } = dayRangeFromQuery(req.query.startDate, req.query.endDate);
+  const publishDate = dateWhere(startDate, endDate);
+  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}), ...(type.success && type.data ? { type: type.data } : {}), ...(publishDate ? { publishDate } : {}) };
   return res.json({ contentItems: business ? await prisma.contentItem.findMany({ where, orderBy: [{ publishDate: 'asc' }, { createdAt: 'desc' }] }) : [] });
 }));
 
@@ -243,6 +276,37 @@ app.delete('/content-items/:id', requireAuth, asyncHandler<AuthedRequest>(async 
   if (!business) return;
   await prisma.contentItem.delete({ where: { id: req.params.id, businessId: business.id } });
   return res.status(204).send();
+}));
+
+
+app.get('/calendar', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await firstBusiness(req.userId!);
+  if (!business) return res.json({ tasks: [], contentItems: [] });
+  const { startDate, endDate } = dayRangeFromQuery(req.query.startDate, req.query.endDate);
+  const [tasks, contentItems] = await Promise.all([
+    prisma.task.findMany({ where: { businessId: business.id, dueDate: dateWhere(startDate, endDate) }, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] }),
+    prisma.contentItem.findMany({ where: { businessId: business.id, publishDate: dateWhere(startDate, endDate) }, orderBy: [{ publishDate: 'asc' }, { createdAt: 'desc' }] })
+  ]);
+  return res.json({ tasks, contentItems });
+}));
+
+app.get('/weekly-plan', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await firstBusiness(req.userId!);
+  if (!business) return res.json({ tasks: [], plannedPosts: [], campaigns: [], missingActions: [] });
+  const weekStart = typeof req.query.weekStart === 'string' ? startOfWeek(new Date(`${req.query.weekStart}T12:00:00`)) : startOfWeek();
+  const weekEnd = addDays(weekStart, 6);
+  weekEnd.setHours(23, 59, 59, 999);
+  const [tasks, plannedPosts, campaigns] = await Promise.all([
+    prisma.task.findMany({ where: { businessId: business.id, status: { not: 'done' }, dueDate: { gte: weekStart, lte: weekEnd } }, orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }] }),
+    prisma.contentItem.findMany({ where: { businessId: business.id, status: { in: ['draft', 'planned'] }, publishDate: { gte: weekStart, lte: weekEnd } }, orderBy: [{ publishDate: 'asc' }, { createdAt: 'desc' }] }),
+    prisma.campaign.findMany({ where: { businessId: business.id, status: { in: ['planned', 'active'] }, OR: [{ startDate: null }, { startDate: { lte: weekEnd } }], AND: [{ OR: [{ endDate: null }, { endDate: { gte: weekStart } }] }] }, orderBy: [{ startDate: 'asc' }, { createdAt: 'desc' }] })
+  ]);
+  const missingActions = [
+    ...(tasks.length === 0 ? [{ id: 'tasks', title: 'Add weekly tasks', description: 'Create at least one due task so your next marketing action is clear.' }] : []),
+    ...(plannedPosts.length === 0 ? [{ id: 'posts', title: 'Schedule a post', description: 'Plan one post, story, email, offer, or website update for this week.' }] : []),
+    ...(campaigns.length === 0 ? [{ id: 'campaigns', title: 'Review campaigns', description: 'No planned or active campaigns overlap this week.' }] : [])
+  ];
+  return res.json({ tasks, plannedPosts, campaigns, missingActions });
 }));
 
 app.get('/campaigns', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
