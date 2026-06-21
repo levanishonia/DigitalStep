@@ -56,13 +56,39 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
 
 const registerSchema = z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(8) });
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const channelSchema = z.enum(['instagram', 'facebook', 'email', 'website', 'in_store']);
+const contentTypeSchema = z.enum(['post', 'story', 'reel', 'campaign', 'offer']);
+const contentStatusSchema = z.enum(['draft', 'planned', 'published']);
+const taskStatusSchema = z.enum(['todo', 'in_progress', 'done']);
+const taskPrioritySchema = z.enum(['low', 'medium', 'high']);
+
+const emptyToUndefined = (value: unknown) => value === '' || value === null ? undefined : value;
+const optionalDateSchema = z.preprocess(emptyToUndefined, z.coerce.date().optional());
+
 const businessSchema = z.object({
   name: z.string().min(2),
   industry: z.string().min(2),
   audience: z.string().min(2),
   location: z.string().optional(),
   primaryGoal: z.string().min(2),
-  channels: z.array(z.enum(['instagram', 'facebook', 'email', 'website', 'in_store'])).min(1)
+  channels: z.array(channelSchema).min(1)
+});
+
+const contentItemSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  type: contentTypeSchema,
+  channel: channelSchema,
+  status: contentStatusSchema,
+  publishDate: optionalDateSchema
+});
+
+const taskSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  dueDate: optionalDateSchema,
+  status: taskStatusSchema,
+  priority: taskPrioritySchema
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'digitalstep-api' }));
@@ -123,6 +149,15 @@ async function firstBusiness(userId: string) {
   return prisma.business.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: 'asc' } });
 }
 
+async function requireFirstBusiness(userId: string, res: Response) {
+  const business = await firstBusiness(userId);
+  if (!business) {
+    res.status(404).json({ message: 'Create a business before adding marketing work.' });
+    return null;
+  }
+  return business;
+}
+
 app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
   if (!business) return res.json({ business: null, tasks: [], contentItems: [], campaigns: [], recommendations: [] });
@@ -139,8 +174,8 @@ app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) 
       take: 5
     }),
     prisma.contentItem.findMany({
-      where: { businessId: business.id, status: { in: ['draft', 'scheduled'] }, OR: [{ scheduledFor: null }, { scheduledFor: { gte: startOfToday } }] },
-      orderBy: [{ scheduledFor: 'asc' }, { createdAt: 'desc' }],
+      where: { businessId: business.id, status: { in: ['draft', 'planned'] }, OR: [{ publishDate: null }, { publishDate: { gte: startOfToday } }] },
+      orderBy: [{ publishDate: 'asc' }, { createdAt: 'desc' }],
       take: 5
     }),
     prisma.campaign.findMany({ where: { businessId: business.id, status: 'active' }, orderBy: { createdAt: 'desc' }, take: 5 }),
@@ -151,12 +186,63 @@ app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) 
 
 app.get('/tasks', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
-  return res.json({ tasks: business ? await prisma.task.findMany({ where: { businessId: business.id }, orderBy: { dueDate: 'asc' } }) : [] });
+  const status = taskStatusSchema.optional().safeParse(req.query.status);
+  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}) };
+  return res.json({ tasks: business ? await prisma.task.findMany({ where, orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }] }) : [] });
+}));
+
+app.post('/tasks', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = taskSchema.parse(req.body);
+  const task = await prisma.task.create({ data: { ...input, description: input.description?.trim() || null, businessId: business.id } });
+  return res.status(201).json({ task });
+}));
+
+app.put('/tasks/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = taskSchema.parse(req.body);
+  const task = await prisma.task.update({ where: { id: req.params.id, businessId: business.id }, data: { ...input, description: input.description?.trim() || null } });
+  return res.json({ task });
+}));
+
+app.delete('/tasks/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  await prisma.task.delete({ where: { id: req.params.id, businessId: business.id } });
+  return res.status(204).send();
 }));
 
 app.get('/content-items', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
-  return res.json({ contentItems: business ? await prisma.contentItem.findMany({ where: { businessId: business.id }, orderBy: { createdAt: 'desc' } }) : [] });
+  const status = contentStatusSchema.optional().safeParse(req.query.status);
+  const type = contentTypeSchema.optional().safeParse(req.query.type);
+  const where = { businessId: business?.id, ...(status.success && status.data ? { status: status.data } : {}), ...(type.success && type.data ? { type: type.data } : {}) };
+  return res.json({ contentItems: business ? await prisma.contentItem.findMany({ where, orderBy: [{ publishDate: 'asc' }, { createdAt: 'desc' }] }) : [] });
+}));
+
+app.post('/content-items', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = contentItemSchema.parse(req.body);
+  const contentItem = await prisma.contentItem.create({ data: { ...input, description: input.description?.trim() || null, notes: input.description?.trim() || null, scheduledFor: input.publishDate, businessId: business.id } });
+  return res.status(201).json({ contentItem });
+}));
+
+app.put('/content-items/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = contentItemSchema.parse(req.body);
+  const contentItem = await prisma.contentItem.update({ where: { id: req.params.id, businessId: business.id }, data: { ...input, description: input.description?.trim() || null, notes: input.description?.trim() || null, scheduledFor: input.publishDate } });
+  return res.json({ contentItem });
+}));
+
+app.delete('/content-items/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  await prisma.contentItem.delete({ where: { id: req.params.id, businessId: business.id } });
+  return res.status(204).send();
 }));
 
 app.get('/campaigns', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
@@ -193,6 +279,10 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (isPrismaKnownRequestError(error)) {
     if (error.code === 'P2002') {
       return res.status(409).json({ message: 'Email already registered' });
+    }
+
+    if (error.code === 'P2025') {
+      return res.status(404).json({ message: 'Item not found' });
     }
 
     const status = error.code === 'P2021' || error.code === 'P2022' ? 503 : 500;
