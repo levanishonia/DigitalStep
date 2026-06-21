@@ -2,6 +2,8 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://digitalstepap
 
 export type AuthUser = { id: string; name: string; email: string };
 export type AuthResponse = { token: string; user: AuthUser };
+export type Business = { id: string; name: string };
+export type MeResponse = { user: AuthUser; businesses: Business[] };
 
 export async function api<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
@@ -26,4 +28,8 @@ export function register(input: { name: string; email: string; password: string 
 
 export function login(input: { email: string; password: string }) {
   return api<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(input) });
+}
+
+export function getMe(token: string) {
+  return api<MeResponse>('/me', {}, token);
 }
