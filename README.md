@@ -35,7 +35,7 @@ packages/shared   Shared TypeScript types and app constants
 
 3. Start PostgreSQL locally and update `DATABASE_URL` if needed.
 
-4. Generate Prisma Client and run migrations:
+4. Generate Prisma Client and run local development migrations:
 
    ```bash
    npm run db:generate
@@ -101,13 +101,13 @@ Base URL defaults to `http://localhost:4000`.
 
 ## Railway deployment notes
 
-The API is ready to deploy as a Railway service:
+The API is ready to deploy as a Railway service from the repository root. The committed Prisma migrations live in `packages/database/prisma/migrations`, so production deploys should use `prisma migrate deploy` rather than `prisma migrate dev`.
 
 1. Create a Railway PostgreSQL database.
-2. Set service root to `apps/api` if deploying the API as a focused service, or use the root with the commands below.
+2. Deploy the service from the repository root so Railway can access the API workspace and the database package migrations.
 3. Add environment variables:
    - `DATABASE_URL` from Railway PostgreSQL
-   - `JWT_SECRET`
+   - `JWT_SECRET` set to a long random value; it is required when `NODE_ENV=production`
    - `CORS_ORIGIN` for your Expo/web origin when applicable
    - `NODE_ENV=production`
 4. Build command from repo root:
@@ -116,16 +116,17 @@ The API is ready to deploy as a Railway service:
    npm install && npm run db:generate && npm run build --workspace @digitalstep/api
    ```
 
-5. Start command from repo root:
+5. Start command from repo root. This applies any pending Prisma migrations before starting the API, which prevents runtime errors such as `P2021: The table public.User does not exist` on fresh Railway databases:
 
    ```bash
+   npm run db:deploy && npm run start --workspace @digitalstep/api
+   ```
+
+6. If you prefer Railway pre-deploy commands, set the pre-deploy command to run migrations and keep the start command focused on the API:
+
+   ```bash
+   npm run db:deploy
    npm run start --workspace @digitalstep/api
    ```
 
-6. Run migrations before production traffic:
-
-   ```bash
-   npm run db:migrate
-   ```
-
-Railway automatically provides `PORT`; the API falls back to `4000` locally.
+Railway automatically provides `PORT`; the API falls back to `4000` locally. Local development should continue to use `npm run db:migrate`, while Railway/production should use `npm run db:deploy`.
