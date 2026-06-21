@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthContext';
 import { Screen, Button, Field, Row, ErrorMessage, Card, Badge, IconCircle, Skeleton } from '../components/UI';
 import { colors } from '../theme/theme';
-import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
+import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
 
 const channels: { label: string; value: MarketingChannel }[] = [
   { label: 'Instagram', value: 'instagram' },
@@ -273,12 +273,52 @@ export function CalendarScreen() {
 export function WeeklyPlanScreen() {
   const { token } = useAuth();
   const [plan, setPlan] = useState<WeeklyPlanResponse | null>(null);
+  const [draftTasks, setDraftTasks] = useState<NonNullable<WeeklyPlanResponse['generatedPlan']>['tasks']>([]);
+  const [draftContent, setDraftContent] = useState<NonNullable<WeeklyPlanResponse['generatedPlan']>['contentItems']>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const weekStart = dateKey(startOfWeekDate(new Date()));
-  const load = useCallback(async () => { if (!token) return; setLoading(true); setError(''); try { setPlan(await getWeeklyPlan(token, weekStart)); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); } }, [token, weekStart]);
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError('');
+    try {
+      const nextPlan = await getWeeklyPlan(token, weekStart);
+      setPlan(nextPlan);
+      setDraftTasks(nextPlan.generatedPlan?.tasks ?? []);
+      setDraftContent(nextPlan.generatedPlan?.contentItems ?? []);
+    } catch (err) {
+      setError(cleanApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }, [token, weekStart]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
-  return <Screen title="Weekly Plan" subtitle="This week’s tasks, planned posts, campaigns, and gaps."><ErrorMessage message={error} />{loading ? <ActivityIndicator color={colors.primary} /> : <><Section title="This week’s tasks">{plan?.tasks.length ? plan.tasks.map((task) => <Row key={task.id} title={task.title} detail={`${formatDate(task.dueDate)} · ${labelText(task.priority)} priority · ${labelText(task.status)}`} />) : <EmptyState title="No tasks this week" detail="Add due tasks from Calendar or Marketing tasks." />}</Section><Section title="Planned posts">{plan?.plannedPosts.length ? plan.plannedPosts.map((item) => <Row key={item.id} title={item.title} detail={`${formatDate(item.publishDate ?? item.scheduledFor)} · ${labelText(item.type)} · ${labelChannel(item.channel)}`} />) : <EmptyState title="No planned posts" detail="Schedule at least one content item for this week." />}</Section><Section title="Campaigns">{plan?.campaigns.length ? plan.campaigns.map((campaign) => <Row key={campaign.id} title={campaign.name} detail={`${labelText(campaign.status)} · ${campaign.objective}`} />) : <EmptyState title="No campaigns this week" detail="Planned and active campaigns will show here." />}</Section><Section title="Missing actions">{plan?.missingActions.length ? plan.missingActions.map((action) => <Row key={action.id} title={action.title} detail={action.description} />) : <EmptyState title="You are covered" detail="This week has tasks, planned content, and campaign coverage." />}</Section></>}</Screen>;
+  function regenerate() {
+    if (!plan?.generatedPlan) return;
+    const stamp = Date.now().toString().slice(-4);
+    setNotice('A fresh rule-based plan was generated. Review, edit, then accept it.');
+    setDraftTasks(plan.generatedPlan.tasks.map((task, index) => ({ ...task, id: `${task.id}-${stamp}`, dueDate: addDaysToDate(startOfWeekDate(new Date()), [1, 3, 5, 6][index] ?? index).toISOString() })));
+    setDraftContent(plan.generatedPlan.contentItems.map((item, index) => ({ ...item, id: `${item.id}-${stamp}`, publishDate: addDaysToDate(startOfWeekDate(new Date()), [0, 1, 3, 4][index] ?? index).toISOString() })));
+  }
+  async function accept() {
+    if (!token || (!draftTasks.length && !draftContent.length)) return;
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await acceptWeeklyPlan({ tasks: draftTasks.map(({ id, day, ...task }) => task), contentItems: draftContent.map(({ id, day, ...item }) => item) }, token);
+      setNotice('Smart weekly plan accepted and added to your tasks and content planner.');
+      await load();
+    } catch (err) {
+      setError(cleanApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+  return <Screen title="Weekly Plan" subtitle="Smart rule-based weekly plan generated from your business profile."><ErrorMessage message={error} />{notice ? <Card><Text style={{ color: colors.success, fontWeight: '800' }}>{notice}</Text></Card> : null}{loading ? <ActivityIndicator color={colors.primary} /> : <>{plan?.generatedPlan ? <Section title="Smart Marketing Plan" action={<Badge label={plan.generatedPlan.industryTemplate} tone="info" />}><Card elevated><Text style={{ color: colors.text, fontWeight: '900', fontSize: 17 }}>Weekly focus</Text><Text style={{ color: colors.muted, marginTop: 8, lineHeight: 20 }}>{plan.generatedPlan.focus}</Text><Text style={{ color: colors.muted, marginTop: 8 }}>{formatDate(plan.generatedPlan.weekStart)} – {formatDate(plan.generatedPlan.weekEnd)}</Text></Card><Text style={{ color: colors.text, fontWeight: '800' }}>Recommended tasks</Text>{draftTasks.map((task, index) => <Card key={task.id}><Text style={{ color: colors.muted, fontWeight: '800' }}>{task.day} · {formatDate(task.dueDate)} · {labelText(task.priority)} priority</Text><Field placeholder="Task title" value={task.title} onChangeText={(title) => setDraftTasks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, title } : item))} /><Field placeholder="Task details" multiline value={task.description} onChangeText={(description) => setDraftTasks((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, description } : item))} /></Card>)}<Text style={{ color: colors.text, fontWeight: '800' }}>Recommended content</Text>{draftContent.map((item, index) => <Card key={item.id}><Text style={{ color: colors.muted, fontWeight: '800' }}>{item.day} · {formatDate(item.publishDate)} · {labelText(item.type)} · {labelChannel(item.channel)}</Text><Field placeholder="Content title" value={item.title} onChangeText={(title) => setDraftContent((items) => items.map((content, itemIndex) => itemIndex === index ? { ...content, title } : content))} /><Field placeholder="Content details" multiline value={item.description} onChangeText={(description) => setDraftContent((items) => items.map((content, itemIndex) => itemIndex === index ? { ...content, description } : content))} /></Card>)}<Button label="Accept plan" icon="checkmark-circle" loading={saving} disabled={!draftTasks.length && !draftContent.length} onPress={accept} /><Button secondary label="Regenerate plan" icon="refresh" onPress={regenerate} /></Section> : <EmptyState title="No business profile" detail="Complete onboarding to generate a weekly marketing plan." />}<Section title="Accepted tasks this week">{plan?.tasks.length ? plan.tasks.map((task) => <Row key={task.id} title={task.title} detail={`${formatDate(task.dueDate)} · ${labelText(task.priority)} priority · ${labelText(task.status)}`} />) : <EmptyState title="No accepted tasks yet" detail="Accept the smart plan to create recommended tasks." />}</Section><Section title="Accepted content this week">{plan?.plannedPosts.length ? plan.plannedPosts.map((item) => <Row key={item.id} title={item.title} detail={`${formatDate(item.publishDate ?? item.scheduledFor)} · ${labelText(item.type)} · ${labelChannel(item.channel)}`} />) : <EmptyState title="No accepted content yet" detail="Accept the smart plan to create posts, stories, emails, offers, or website updates." />}</Section><Section title="Campaigns">{plan?.campaigns.length ? plan.campaigns.map((campaign) => <Row key={campaign.id} title={campaign.name} detail={`${labelText(campaign.status)} · ${campaign.objective}`} />) : <EmptyState title="No campaigns this week" detail="Planned and active campaigns will show here." />}</Section><Section title="Missing actions">{plan?.missingActions.length ? plan.missingActions.map((action) => <Row key={action.id} title={action.title} detail={action.description} />) : <EmptyState title="You are covered" detail="This week has tasks, planned content, and campaign coverage." />}</Section></>}</Screen>;
 }
 
 export function CampaignsScreen() {
