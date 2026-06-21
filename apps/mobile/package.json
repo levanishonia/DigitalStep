@@ -2,7 +2,7 @@
   "name": "@digitalstep/mobile",
   "version": "0.1.0",
   "private": true,
-  "main": "apps/mobile/index.js",
+  "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
