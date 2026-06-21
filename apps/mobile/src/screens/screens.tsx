@@ -31,7 +31,7 @@ function formatDate(value?: string | null) {
 
 function toDateInput(value?: string | null) {
   if (!value) return '';
-  return new Date(value).toISOString().slice(0, 10);
+  return dateKey(new Date(value));
 }
 
 function labelText(value: string) {
@@ -203,7 +203,12 @@ export function PlannerScreen() {
 
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function dateKey(date: Date) { return date.toISOString().slice(0, 10); }
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 function displayLongDate(key: string) { return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${key}T12:00:00`)); }
 function startOfWeekDate(date: Date) { const next = new Date(date); const day = next.getDay(); next.setDate(next.getDate() + (day === 0 ? -6 : 1 - day)); next.setHours(12, 0, 0, 0); return next; }
 function addDaysToDate(date: Date, days: number) { const next = new Date(date); next.setDate(next.getDate() + days); return next; }
