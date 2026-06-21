@@ -89,9 +89,33 @@ app.get('/me', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   return res.json({ user: publicUser(user), businesses: user.businesses });
 }));
 
+app.get('/businesses', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const businesses = await prisma.business.findMany({ where: { ownerId: req.userId }, orderBy: { createdAt: 'asc' } });
+  return res.json({ businesses });
+}));
+
 app.post('/businesses', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const input = businessSchema.parse(req.body);
-  const business = await prisma.business.create({ data: { ...input, ownerId: req.userId! } });
+  const business = await prisma.business.create({
+    data: {
+      ...input,
+      ownerId: req.userId!,
+      recommendations: {
+        create: [
+          {
+            title: 'Pick one consistent weekly action',
+            description: `Start with a simple recurring marketing habit for ${input.name}, such as a weekly post, email, or in-store update.`,
+            priority: 1
+          },
+          {
+            title: 'Match your channels to your audience',
+            description: `Focus first on ${input.channels.length === 1 ? 'the selected channel' : 'the selected channels'} that best reach ${input.audience}.`,
+            priority: 2
+          }
+        ]
+      }
+    }
+  });
   return res.status(201).json({ business });
 }));
 

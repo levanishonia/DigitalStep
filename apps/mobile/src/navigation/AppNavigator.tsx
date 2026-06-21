@@ -48,5 +48,5 @@ export function AppNavigator() {
     return <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.primary} size="large" /></View>;
   }
 
-  return isAuthenticated ? <AppStack hasBusiness={Boolean(hasBusiness)} /> : <AuthStack />;
+  return isAuthenticated ? <AppStack key={hasBusiness ? 'business-ready' : 'needs-business'} hasBusiness={Boolean(hasBusiness)} /> : <AuthStack />;
 }
