@@ -16,26 +16,12 @@ BEGIN
   END IF;
 END $$;
 
--- Prepare existing content statuses for the new planner vocabulary.
-DO $$
-BEGIN
-  IF to_regclass('"ContentItem"') IS NOT NULL
-    AND EXISTS (
-      SELECT 1
-      FROM information_schema.columns
-      WHERE table_schema = current_schema()
-        AND table_name = 'ContentItem'
-        AND column_name = 'status'
-    )
-  THEN
-    UPDATE "ContentItem" SET "status" = 'planned' WHERE "status"::text IN ('idea', 'scheduled');
-  END IF;
-END $$;
-
 -- AlterEnum for ContentStatus, only when the old enum still needs to be converted.
 DO $$
 DECLARE
   current_labels text[];
+  status_type_name text;
+  content_status_new_in_use boolean;
 BEGIN
   SELECT array_agg(e.enumlabel ORDER BY e.enumsortorder)
   INTO current_labels
@@ -43,12 +29,42 @@ BEGIN
   JOIN pg_type t ON t.oid = e.enumtypid
   WHERE t.typname = 'ContentStatus';
 
-  IF current_labels IS NOT NULL AND current_labels <> ARRAY['draft', 'planned', 'published'] THEN
+  SELECT t.typname
+  INTO status_type_name
+  FROM pg_attribute a
+  JOIN pg_class c ON c.oid = a.attrelid
+  JOIN pg_type t ON t.oid = a.atttypid
+  WHERE c.oid = to_regclass('"ContentItem"')
+    AND a.attname = 'status'
+    AND NOT a.attisdropped;
+
+  content_status_new_in_use := status_type_name = 'ContentStatus_new';
+
+  IF content_status_new_in_use THEN
+    -- A previous run may have converted the column but stopped before renaming
+    -- ContentStatus_new back to ContentStatus. Complete that transition without
+    -- dropping the in-use type.
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" DROP DEFAULT;
+
+    IF current_labels IS NOT NULL THEN
+      ALTER TYPE "ContentStatus" RENAME TO "ContentStatus_old";
+    END IF;
+
+    ALTER TYPE "ContentStatus_new" RENAME TO "ContentStatus";
+    DROP TYPE IF EXISTS "ContentStatus_old";
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" SET DEFAULT 'draft';
+  ELSIF current_labels IS NOT NULL AND current_labels <> ARRAY['draft', 'planned', 'published'] THEN
     DROP TYPE IF EXISTS "ContentStatus_new";
     CREATE TYPE "ContentStatus_new" AS ENUM ('draft', 'planned', 'published');
 
     ALTER TABLE "ContentItem" ALTER COLUMN "status" DROP DEFAULT;
-    ALTER TABLE "ContentItem" ALTER COLUMN "status" TYPE "ContentStatus_new" USING ("status"::text::"ContentStatus_new");
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" TYPE "ContentStatus_new"
+      USING (
+        CASE
+          WHEN "status"::text IN ('idea', 'scheduled') THEN 'planned'
+          ELSE "status"::text
+        END::"ContentStatus_new"
+      );
     ALTER TYPE "ContentStatus" RENAME TO "ContentStatus_old";
     ALTER TYPE "ContentStatus_new" RENAME TO "ContentStatus";
     DROP TYPE "ContentStatus_old";
