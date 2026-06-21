@@ -5,6 +5,13 @@ export type AuthResponse = { token: string; user: AuthUser };
 export type Business = { id: string; name: string };
 export type MeResponse = { user: AuthUser; businesses: Business[] };
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status?: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 export async function api<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -17,7 +24,7 @@ export async function api<T>(path: string, options: RequestInit = {}, token?: st
 
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(body?.message ?? 'Something went wrong. Please try again.');
+    throw new ApiError(body?.message ?? 'Something went wrong. Please try again.', response.status);
   }
   return body as T;
 }
