@@ -1,9 +1,9 @@
 import { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { colors, spacing } from '../theme/theme';
 
 export function Screen({ children, title, subtitle, centered }: { children: ReactNode; title: string; subtitle?: string; centered?: boolean }) {
-  return <ScrollView contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled"><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></ScrollView>;
+  return <ScrollView style={styles.scroll} contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled"><View style={styles.webPreviewFrame}><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></View></ScrollView>;
 }
 export function Card({ children }: { children: ReactNode }) { return <View style={styles.card}>{children}</View>; }
 export function Button({ label, onPress, secondary, loading, disabled }: { label: string; onPress: () => void; secondary?: boolean; loading?: boolean; disabled?: boolean }) {
@@ -14,7 +14,9 @@ export function Row({ title, detail }: { title: string; detail?: string }) { ret
 export function ErrorMessage({ message }: { message?: string }) { return message ? <Text style={styles.error}>{message}</Text> : null; }
 
 const styles = StyleSheet.create({
-  screen: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.lg, paddingTop: 64 },
+  scroll: { flex: 1, backgroundColor: colors.background },
+  screen: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.lg, paddingTop: 64, ...(Platform.OS === 'web' ? { alignItems: 'center' } : {}) },
+  webPreviewFrame: { width: '100%', ...(Platform.OS === 'web' ? { maxWidth: 480 } : {}) },
   centered: { justifyContent: 'center' },
   title: { fontSize: 34, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   subtitle: { color: colors.muted, fontSize: 16, marginTop: spacing.sm, lineHeight: 23 },
