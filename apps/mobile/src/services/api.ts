@@ -63,6 +63,10 @@ export function getMe(token: string) {
   return api<MeResponse>('/me', {}, token);
 }
 
+export function getBusinesses(token: string) {
+  return api<{ businesses: Business[] }>('/businesses', {}, token);
+}
+
 export function createBusiness(input: BusinessInput, token: string) {
   return api<{ business: Business }>('/businesses', { method: 'POST', body: JSON.stringify(input) }, token);
 }
