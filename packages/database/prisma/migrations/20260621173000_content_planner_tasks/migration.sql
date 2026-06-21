@@ -1,28 +1,74 @@
--- CreateEnum
-CREATE TYPE "TaskPriority" AS ENUM ('low', 'medium', 'high');
+-- Make the planner migration safe to re-run after a partially applied deploy.
 
 -- CreateEnum
-CREATE TYPE "ContentType" AS ENUM ('post', 'story', 'reel', 'campaign', 'offer');
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TaskPriority') THEN
+    CREATE TYPE "TaskPriority" AS ENUM ('low', 'medium', 'high');
+  END IF;
+END $$;
+
+-- CreateEnum
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ContentType') THEN
+    CREATE TYPE "ContentType" AS ENUM ('post', 'story', 'reel', 'campaign', 'offer');
+  END IF;
+END $$;
 
 -- Prepare existing content statuses for the new planner vocabulary.
-UPDATE "ContentItem" SET "status" = 'planned' WHERE "status" = 'idea' OR "status" = 'scheduled';
+DO $$
+BEGIN
+  IF to_regclass('"ContentItem"') IS NOT NULL
+    AND EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = 'ContentItem'
+        AND column_name = 'status'
+    )
+  THEN
+    UPDATE "ContentItem" SET "status" = 'planned' WHERE "status"::text IN ('idea', 'scheduled');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "ContentStatus_new" AS ENUM ('draft', 'planned', 'published');
+-- AlterEnum for ContentStatus, only when the old enum still needs to be converted.
+DO $$
+DECLARE
+  current_labels text[];
+BEGIN
+  SELECT array_agg(e.enumlabel ORDER BY e.enumsortorder)
+  INTO current_labels
+  FROM pg_enum e
+  JOIN pg_type t ON t.oid = e.enumtypid
+  WHERE t.typname = 'ContentStatus';
 
--- AlterEnum for ContentStatus
-ALTER TABLE "ContentItem" ALTER COLUMN "status" DROP DEFAULT;
-ALTER TABLE "ContentItem" ALTER COLUMN "status" TYPE "ContentStatus_new" USING ("status"::text::"ContentStatus_new");
-ALTER TYPE "ContentStatus" RENAME TO "ContentStatus_old";
-ALTER TYPE "ContentStatus_new" RENAME TO "ContentStatus";
-DROP TYPE "ContentStatus_old";
-ALTER TABLE "ContentItem" ALTER COLUMN "status" SET DEFAULT 'draft';
+  IF current_labels IS NOT NULL AND current_labels <> ARRAY['draft', 'planned', 'published'] THEN
+    DROP TYPE IF EXISTS "ContentStatus_new";
+    CREATE TYPE "ContentStatus_new" AS ENUM ('draft', 'planned', 'published');
+
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" DROP DEFAULT;
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" TYPE "ContentStatus_new" USING ("status"::text::"ContentStatus_new");
+    ALTER TYPE "ContentStatus" RENAME TO "ContentStatus_old";
+    ALTER TYPE "ContentStatus_new" RENAME TO "ContentStatus";
+    DROP TYPE "ContentStatus_old";
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" SET DEFAULT 'draft';
+  ELSIF current_labels IS NOT NULL THEN
+    ALTER TABLE "ContentItem" ALTER COLUMN "status" SET DEFAULT 'draft';
+  END IF;
+END $$;
 
 -- AlterTable
-ALTER TABLE "ContentItem" ADD COLUMN "description" TEXT,
-ADD COLUMN "type" "ContentType" NOT NULL DEFAULT 'post',
-ADD COLUMN "publishDate" TIMESTAMP(3);
+ALTER TABLE "ContentItem" ADD COLUMN IF NOT EXISTS "description" TEXT;
+ALTER TABLE "ContentItem" ADD COLUMN IF NOT EXISTS "type" "ContentType" DEFAULT 'post';
+UPDATE "ContentItem" SET "type" = 'post' WHERE "type" IS NULL;
+ALTER TABLE "ContentItem" ALTER COLUMN "type" SET DEFAULT 'post';
+ALTER TABLE "ContentItem" ALTER COLUMN "type" SET NOT NULL;
 
+ALTER TABLE "ContentItem" ADD COLUMN IF NOT EXISTS "publishDate" TIMESTAMP(3);
 UPDATE "ContentItem" SET "publishDate" = "scheduledFor" WHERE "publishDate" IS NULL;
 
-ALTER TABLE "Task" ADD COLUMN "priority" "TaskPriority" NOT NULL DEFAULT 'medium';
+ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "priority" "TaskPriority" DEFAULT 'medium';
+UPDATE "Task" SET "priority" = 'medium' WHERE "priority" IS NULL;
+ALTER TABLE "Task" ALTER COLUMN "priority" SET DEFAULT 'medium';
+ALTER TABLE "Task" ALTER COLUMN "priority" SET NOT NULL;
