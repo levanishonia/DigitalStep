@@ -42,8 +42,8 @@ async function persistAuth(response: AuthResponse) {
   await setStoredToken(response.token);
 }
 
-function isInvalidTokenError(error: unknown) {
-  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+function isStaleStoredAuthError(error: unknown) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404);
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(me.user);
         setHasBusiness(me.businesses.length > 0);
       } catch (error) {
-        if (isInvalidTokenError(error)) {
+        if (isStaleStoredAuthError(error)) {
           await deleteStoredToken();
         }
         setToken(null);
