@@ -174,6 +174,13 @@ function addDays(date: Date, days: number) {
   return next;
 }
 
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 async function firstBusiness(userId: string) {
   return prisma.business.findFirst({ where: { ownerId: userId }, orderBy: { createdAt: 'asc' } });
 }
@@ -378,13 +385,13 @@ function generateMarketingPlan(business: Awaited<ReturnType<typeof firstBusiness
     const channel = index === 1 ? preferredChannel(channels, ['instagram', 'facebook']) : index === 2 ? preferredChannel(channels, ['email', 'in_store', 'website', 'facebook', 'instagram']) : preferredChannel(channels, ['instagram', 'facebook', 'website', 'email', 'in_store']);
     const date = addDays(weekStart, contentDays[index]);
     const location = business.location ? ` in ${business.location}` : '';
-    return { id: `content-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: `${template.label}: ${theme}`, description: `For ${business.audience}${location}, connect this ${theme} to the goal: ${business.primaryGoal}.`, type: (index === 1 ? 'story' : index === 2 ? 'offer' : 'post') as GeneratedPlanContent['type'], channel, publishDate: date.toISOString() };
+    return { id: `content-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: `${template.label}: ${theme}`, description: `For ${business.audience}${location}, connect this ${theme} to the goal: ${business.primaryGoal}.`, type: (index === 1 ? 'story' : index === 2 ? 'offer' : 'post') as GeneratedPlanContent['type'], channel, publishDate: dateKey(date) };
   });
   const tasks = template.taskThemes.concat([{ title: 'Review weekly performance', description: 'Check engagement, inquiries, reviews, and completed tasks. Decide what to repeat next week.', priority: 'low' as const }]).map((task, index) => {
     const date = addDays(weekStart, [0, 2, 4, 6][index] ?? index);
-    return { id: `task-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: task.title, description: task.description, dueDate: date.toISOString(), priority: task.priority };
+    return { id: `task-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: task.title, description: task.description, dueDate: dateKey(date), priority: task.priority };
   });
-  return { industryTemplate: template.label, weekStart: weekStart.toISOString(), weekEnd: weekEnd.toISOString(), focus: `This week, focus on ${template.focus} for ${business.audience}.`, tasks, contentItems };
+  return { industryTemplate: template.label, weekStart: dateKey(weekStart), weekEnd: dateKey(weekEnd), focus: `This week, focus on ${template.focus} for ${business.audience}.`, tasks, contentItems };
 }
 
 const generatedTaskSchema = z.object({ title: z.string().min(1), description: z.string().optional(), dueDate: z.coerce.date(), priority: taskPrioritySchema });
