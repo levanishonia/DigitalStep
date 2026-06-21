@@ -102,10 +102,24 @@ async function firstBusiness(userId: string) {
 app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
   if (!business) return res.json({ business: null, tasks: [], contentItems: [], campaigns: [], recommendations: [] });
+  const now = new Date();
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
+
   const [tasks, contentItems, campaigns, recommendations] = await Promise.all([
-    prisma.task.findMany({ where: { businessId: business.id }, orderBy: { dueDate: 'asc' }, take: 5 }),
-    prisma.contentItem.findMany({ where: { businessId: business.id }, orderBy: { scheduledFor: 'asc' }, take: 5 }),
-    prisma.campaign.findMany({ where: { businessId: business.id }, orderBy: { createdAt: 'desc' } }),
+    prisma.task.findMany({
+      where: { businessId: business.id, status: { not: 'done' }, dueDate: { gte: startOfToday, lte: endOfToday } },
+      orderBy: { dueDate: 'asc' },
+      take: 5
+    }),
+    prisma.contentItem.findMany({
+      where: { businessId: business.id, status: { in: ['draft', 'scheduled'] }, OR: [{ scheduledFor: null }, { scheduledFor: { gte: startOfToday } }] },
+      orderBy: [{ scheduledFor: 'asc' }, { createdAt: 'desc' }],
+      take: 5
+    }),
+    prisma.campaign.findMany({ where: { businessId: business.id, status: 'active' }, orderBy: { createdAt: 'desc' }, take: 5 }),
     prisma.recommendation.findMany({ where: { businessId: business.id }, orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }], take: 5 })
   ]);
   return res.json({ business, tasks, contentItems, campaigns, recommendations });
