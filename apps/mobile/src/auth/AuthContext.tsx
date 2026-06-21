@@ -2,7 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { ApiError, AuthResponse, AuthUser, getMe, login as loginRequest, register as registerRequest } from '../services/api';
+import { ApiError, AuthResponse, AuthUser, BusinessInput, createBusiness, getMe, login as loginRequest, register as registerRequest } from '../services/api';
 
 const TOKEN_KEY = 'digitalstep.authToken';
 
@@ -14,6 +14,8 @@ type AuthContextValue = {
   hasBusiness: boolean | null;
   login: (input: { email: string; password: string }) => Promise<void>;
   register: (input: { name: string; email: string; password: string }) => Promise<void>;
+  completeBusinessOnboarding: (input: BusinessInput) => Promise<void>;
+  refreshBusinessStatus: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -97,6 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(response.token);
       setUser(response.user);
       setHasBusiness(false);
+    },
+    async completeBusinessOnboarding(input) {
+      if (!token) throw new Error('You must be logged in to create a business.');
+      await createBusiness(input, token);
+      setHasBusiness(true);
+    },
+    async refreshBusinessStatus() {
+      if (!token) return;
+      const me = await getMe(token);
+      setUser(me.user);
+      setHasBusiness(me.businesses.length > 0);
     },
     async logout() {
       await deleteStoredToken();
