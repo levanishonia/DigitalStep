@@ -2,7 +2,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { AuthResponse, AuthUser, getMe, login as loginRequest, register as registerRequest } from '../services/api';
+import { ApiError, AuthResponse, AuthUser, getMe, login as loginRequest, register as registerRequest } from '../services/api';
 
 const TOKEN_KEY = 'digitalstep.authToken';
 
@@ -42,6 +42,10 @@ async function persistAuth(response: AuthResponse) {
   await setStoredToken(response.token);
 }
 
+function isInvalidTokenError(error: unknown) {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [token, setToken] = useState<string | null>(null);
@@ -58,8 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         setUser(me.user);
         setHasBusiness(me.businesses.length > 0);
-      } catch {
-        await deleteStoredToken();
+      } catch (error) {
+        if (isInvalidTokenError(error)) {
+          await deleteStoredToken();
+        }
         setToken(null);
         setUser(null);
         setHasBusiness(null);
