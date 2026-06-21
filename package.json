@@ -1,0 +1,24 @@
+{
+  "name": "digitalstep",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DigitalStep monorepo for a mobile-first marketing management app.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @digitalstep/api",
+    "dev:api": "npm run dev --workspace @digitalstep/api",
+    "dev:mobile": "npm run start --workspace @digitalstep/mobile",
+    "build": "npm run build --workspace @digitalstep/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @digitalstep/database",
+    "db:migrate": "npm run db:migrate --workspace @digitalstep/database",
+    "db:seed": "npm run db:seed --workspace @digitalstep/database"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

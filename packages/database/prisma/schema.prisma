@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MarketingChannel {
+  instagram
+  facebook
+  email
+  website
+  in_store
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  done
+}
+
+enum ContentStatus {
+  idea
+  draft
+  scheduled
+  published
+}
+
+enum CampaignStatus {
+  planned
+  active
+  paused
+  completed
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  businesses   Business[]
+}
+
+model Business {
+  id              String           @id @default(cuid())
+  name            String
+  industry        String
+  audience        String
+  location        String?
+  primaryGoal     String
+  channels        MarketingChannel[]
+  ownerId         String
+  owner           User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  contentItems    ContentItem[]
+  tasks           Task[]
+  campaigns       Campaign[]
+  recommendations Recommendation[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model ContentItem {
+  id          String           @id @default(cuid())
+  title       String
+  channel     MarketingChannel
+  status      ContentStatus    @default(idea)
+  scheduledFor DateTime?
+  notes       String?
+  businessId  String
+  business    Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model Task {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      TaskStatus    @default(todo)
+  businessId  String
+  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  objective   String
+  status      CampaignStatus @default(planned)
+  startDate   DateTime?
+  endDate     DateTime?
+  businessId  String
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model Recommendation {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  priority    Int      @default(2)
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
