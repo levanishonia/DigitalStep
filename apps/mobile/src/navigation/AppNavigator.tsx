@@ -32,9 +32,9 @@ function AuthStack() {
   );
 }
 
-function AppStack() {
+function AppStack({ hasBusiness }: { hasBusiness: boolean }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName={hasBusiness ? 'Main' : 'BusinessOnboarding'} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="BusinessOnboarding" component={BusinessOnboardingScreen} />
       <Stack.Screen name="Main" component={MainTabs} />
     </Stack.Navigator>
@@ -42,11 +42,11 @@ function AppStack() {
 }
 
 export function AppNavigator() {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { hasBusiness, isAuthenticated, isInitializing } = useAuth();
 
-  if (isInitializing) {
+  if (isInitializing || (isAuthenticated && hasBusiness === null)) {
     return <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.primary} size="large" /></View>;
   }
 
-  return isAuthenticated ? <AppStack /> : <AuthStack />;
+  return isAuthenticated ? <AppStack hasBusiness={Boolean(hasBusiness)} /> : <AuthStack />;
 }
