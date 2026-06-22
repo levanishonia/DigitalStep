@@ -11,7 +11,7 @@ const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 
 const tabIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  HomeTab: 'home', TasksTab: 'checkmark-circle', DSStudioTab: 'sparkles', AnalyticsTab: 'bar-chart', MoreTab: 'menu'
+  HomeTab: 'home', TasksTab: 'checkmark-circle', PlannerTab: 'calendar', DSStudioTab: 'sparkles', AnalyticsTab: 'bar-chart', MoreTab: 'menu'
 };
 
 function HeaderBack({ navigation, title }: any) {
@@ -28,7 +28,7 @@ function MoreStack() { const { t } = useI18n(); return <Stack.Navigator><Stack.S
 function MainTabs() {
   useTheme();
   const { t } = useI18n();
-  const labels: Record<string, string> = { HomeTab: t('nav.home'), TasksTab: t('nav.tasks'), DSStudioTab: t('nav.dsStudio'), AnalyticsTab: t('nav.analytics'), MoreTab: t('nav.more') };
+  const labels: Record<string, string> = { HomeTab: t('nav.home'), TasksTab: t('nav.tasks'), PlannerTab: t('nav.contentPlanner'), DSStudioTab: t('nav.dsStudio'), AnalyticsTab: t('nav.analytics'), MoreTab: t('nav.more') };
   return (
     <Tabs.Navigator screenOptions={({ route }) => ({
       headerShown: false,
@@ -42,6 +42,7 @@ function MainTabs() {
     })}>
       <Tabs.Screen name="HomeTab" component={HomeStack} />
       <Tabs.Screen name="TasksTab" component={TasksStack} />
+      <Tabs.Screen name="PlannerTab" component={MoreStack} options={{ tabBarButton: () => null }} />
       <Tabs.Screen name="DSStudioTab" component={DSStudioStack} />
       <Tabs.Screen name="AnalyticsTab" component={AnalyticsStack} />
       <Tabs.Screen name="MoreTab" component={MoreStack} />

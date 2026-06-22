@@ -63,6 +63,80 @@ const contentStatusSchema = z.enum(['draft', 'planned', 'published']);
 const taskStatusSchema = z.enum(['todo', 'in_progress', 'done']);
 const taskPrioritySchema = z.enum(['low', 'medium', 'high']);
 
+const studioContentTypeSchema = z.enum(['post', 'story', 'reel', 'promotion', 'announcement']);
+const studioPlatformSchema = z.enum(['facebook', 'instagram', 'website', 'email']);
+const studioGoalSchema = z.enum(['sales', 'awareness', 'engagement']);
+const studioToneSchema = z.enum(['professional', 'friendly', 'luxury', 'funny']);
+const studioGenerateSchema = z.object({
+  businessId: z.string().min(1),
+  contentType: studioContentTypeSchema,
+  platform: studioPlatformSchema,
+  goal: studioGoalSchema,
+  tone: studioToneSchema,
+  language: languageSchema
+});
+const studioMonthlyGenerationLimit = Number(process.env.STUDIO_MONTHLY_GENERATION_LIMIT ?? 100);
+
+type StudioGenerateInput = z.infer<typeof studioGenerateSchema>;
+
+const studioLabels = {
+  en: {
+    contentType: { post: 'Post', story: 'Story', reel: 'Reel', promotion: 'Promotion', announcement: 'Announcement' },
+    platform: { facebook: 'Facebook', instagram: 'Instagram', website: 'Website', email: 'Email' },
+    goal: { sales: 'Sales', awareness: 'Awareness', engagement: 'Engagement' },
+    tone: { professional: 'Professional', friendly: 'Friendly', luxury: 'Luxury', funny: 'Funny' }
+  },
+  ka: {
+    contentType: { post: 'პოსტი', story: 'სთორი', reel: 'რილი', promotion: 'პრომოცია', announcement: 'განცხადება' },
+    platform: { facebook: 'Facebook', instagram: 'Instagram', website: 'ვებსაიტი', email: 'ელფოსტა' },
+    goal: { sales: 'გაყიდვები', awareness: 'ცნობადობა', engagement: 'ჩართულობა' },
+    tone: { professional: 'პროფესიული', friendly: 'მეგობრული', luxury: 'ლუქსი', funny: 'სახალისო' }
+  }
+};
+
+function studioLabel(group: keyof typeof studioLabels.en, value: string, language: 'ka' | 'en') {
+  return (studioLabels[language][group] as Record<string, string>)[value] ?? value;
+}
+
+function startOfMonth(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function generateStudioContent(input: StudioGenerateInput, business: { name: string; industry: string }) {
+  const language = input.language;
+  const businessName = business.name.trim() || (language === 'ka' ? 'თქვენი ბიზნესი' : 'your business');
+  const contentType = studioLabel('contentType', input.contentType, language).toLowerCase();
+  const platform = studioLabel('platform', input.platform, language);
+  const goal = studioLabel('goal', input.goal, language).toLowerCase();
+  const tone = studioLabel('tone', input.tone, language).toLowerCase();
+  const variantSeed = businessName.length + input.contentType.length + input.platform.length + input.goal.length + input.tone.length;
+  const anglesEn = ['fresh value', 'customer favorite', 'limited-time moment', 'local story'];
+  const anglesKa = ['ახალი ღირებულება', 'მომხმარებლის რჩეული', 'დროებითი შეთავაზება', 'ლოკალური ისტორია'];
+  const angle = language === 'ka' ? anglesKa[variantSeed % anglesKa.length] : anglesEn[variantSeed % anglesEn.length];
+
+  if (language === 'ka') {
+    const goalLine = input.goal === 'sales' ? 'შეარჩიეთ დღეს და მიიღეთ შედეგი სწრაფად.' : input.goal === 'awareness' ? 'გაიცანით ჩვენი მიდგომა და ის, რაც გამოგვარჩევს.' : 'დაგვიწერეთ კომენტარში, რა გჭირდებათ ყველაზე მეტად.';
+    const toneLine = input.tone === 'luxury' ? 'დეტალებზე ორიენტირებული, დახვეწილი გამოცდილება გელოდებათ.' : input.tone === 'funny' ? 'ცოტა ღიმილი, ბევრი სარგებელი — ასე ვაკეთებთ საქმეს.' : input.tone === 'friendly' ? 'მეგობრულად გიზიარებთ იდეას, რომელიც თქვენს დღეს გაამარტივებს.' : 'პროფესიული გადაწყვეტა თქვენი შემდეგი ნაბიჯისთვის.';
+    return {
+      title: `${businessName}: ${angle}`,
+      caption: `${businessName} გთავაზობთ ${contentType}-ს ${platform}-ისთვის. ${toneLine} მიზანი: ${goal}. ${goalLine}`,
+      cta: input.goal === 'sales' ? 'შეგვეხმიანეთ შესაძენად' : input.goal === 'awareness' ? 'გაიგეთ მეტი ჩვენ შესახებ' : 'დაგვიტოვეთ კომენტარი',
+      hashtags: ['#DigitalStep', '#ქართულიBიზნესი', `#${businessName.replace(/\s+/g, '')}`, input.goal === 'sales' ? '#შეთავაზება' : '#მარკეტინგი'],
+      visualIdea: `${tone} ვიზუალი: პროდუქტის/სერვისის ახლო კადრი, ბრენდის ფერები და მოკლე ტექსტი „${angle}“. `
+    };
+  }
+
+  const goalLine = input.goal === 'sales' ? 'Make it easy to choose today with a clear next step.' : input.goal === 'awareness' ? 'Show what makes the brand memorable and trustworthy.' : 'Invite people to comment, save, or share their preference.';
+  const toneLine = input.tone === 'luxury' ? 'Polished details and a premium feel set the scene.' : input.tone === 'funny' ? 'A light punchline keeps the message memorable.' : input.tone === 'friendly' ? 'A warm, helpful note makes the offer feel personal.' : 'A clear, confident message keeps the focus on value.';
+  return {
+    title: `${businessName}: ${angle}`,
+    caption: `${businessName} is preparing a ${contentType} for ${platform}. ${toneLine} The goal is ${goal}. ${goalLine}`,
+    cta: input.goal === 'sales' ? 'Message us to order' : input.goal === 'awareness' ? 'Learn more today' : 'Comment with your choice',
+    hashtags: ['#DigitalStep', '#SmallBusinessMarketing', `#${businessName.replace(/\s+/g, '')}`, input.goal === 'sales' ? '#SpecialOffer' : '#MarketingTips'],
+    visualIdea: `${tone} visual: close-up product or service moment, brand colors, and a short overlay reading “${angle}”.`
+  };
+}
+
 const emptyToUndefined = (value: unknown) => value === '' || value === null ? undefined : value;
 const optionalDateSchema = z.preprocess(emptyToUndefined, z.coerce.date().optional());
 
@@ -210,6 +284,22 @@ async function requireFirstBusiness(userId: string, res: Response) {
   }
   return business;
 }
+
+
+app.post('/studio/generate', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const input = studioGenerateSchema.parse(req.body);
+  const business = await prisma.business.findFirst({ where: { id: input.businessId, ownerId: req.userId! } });
+  if (!business) return res.status(404).json({ message: 'Business not found for this account.' });
+
+  const generatedThisMonth = await prisma.studioGeneration.count({ where: { userId: req.userId!, createdAt: { gte: startOfMonth() } } });
+  if (generatedThisMonth >= studioMonthlyGenerationLimit) {
+    return res.status(429).json({ message: 'You have reached this month’s DS Studio generation limit. Please try again next month.' });
+  }
+
+  const content = generateStudioContent(input, business);
+  await prisma.studioGeneration.create({ data: { userId: req.userId!, businessId: business.id, contentType: input.contentType, platform: input.platform, language: input.language } });
+  return res.json(content);
+}));
 
 app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);

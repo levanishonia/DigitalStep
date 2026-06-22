@@ -41,6 +41,8 @@ export type GeneratedPlanContent = { id: string; day: string; title: string; des
 export type GeneratedWeeklyPlan = { industryTemplate: string; weekStart: string; weekEnd: string; focus: string; tasks: GeneratedPlanTask[]; contentItems: GeneratedPlanContent[] };
 export type WeeklyPlanResponse = { generatedPlan: GeneratedWeeklyPlan | null; tasks: Task[]; plannedPosts: ContentItem[]; campaigns: Campaign[]; missingActions: { id: string; title: string; description: string }[] };
 export type AcceptWeeklyPlanInput = { tasks: Omit<GeneratedPlanTask, 'id' | 'day'>[]; contentItems: Omit<GeneratedPlanContent, 'id' | 'day'>[] };
+export type StudioGenerateInput = { businessId: string; contentType: 'post' | 'story' | 'reel' | 'promotion' | 'announcement'; platform: 'facebook' | 'instagram' | 'website' | 'email'; goal: 'sales' | 'awareness' | 'engagement'; tone: 'professional' | 'friendly' | 'luxury' | 'funny'; language: Language };
+export type StudioGeneratedContent = { title: string; caption: string; cta: string; hashtags: string[]; visualIdea: string };
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status?: number) {
@@ -98,6 +100,7 @@ export function deleteContentItem(id: string, token: string) { return api<void>(
 export function getCalendar(token: string, startDate: string, endDate: string) { return api<CalendarResponse>(`/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`, {}, token); }
 export function getWeeklyPlan(token: string, weekStart?: string) { return api<WeeklyPlanResponse>(`/weekly-plan${weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : ''}`, {}, token); }
 export function acceptWeeklyPlan(input: AcceptWeeklyPlanInput, token: string) { return api<{ tasksCreated: number; contentItemsCreated: number }>('/weekly-plan/accept', { method: 'POST', body: JSON.stringify(input) }, token); }
+export function generateStudioContent(input: StudioGenerateInput, token: string) { return api<StudioGeneratedContent>('/studio/generate', { method: 'POST', body: JSON.stringify(input) }, token); }
 
 export function updatePreferredLanguage(preferredLanguage: Language, token: string) { return api<{ user: AuthUser }>('/me/language', { method: 'PUT', body: JSON.stringify({ preferredLanguage }) }, token); }
 export function updateBusinessContentLanguage(contentLanguage: Language, token: string) { return api<{ business: Business }>('/businesses/current/content-language', { method: 'PUT', body: JSON.stringify({ contentLanguage }) }, token); }
