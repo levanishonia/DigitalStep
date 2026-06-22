@@ -77,6 +77,7 @@ const studioGoalSchema = z.enum(['sales', 'awareness', 'engagement']);
 const studioToneSchema = z.enum(['professional', 'friendly', 'luxury', 'funny']);
 const studioGenerateSchema = z.object({
   businessId: z.string().min(1),
+  businessType: z.string().trim().optional(),
   contentType: studioContentTypeSchema,
   platform: studioPlatformSchema,
   goal: studioGoalSchema,
@@ -110,14 +111,14 @@ function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function generateStudioContent(input: StudioGenerateInput, business: { name: string; industry: string }) {
+function generateStudioContent(input: StudioGenerateInput, business: { name: string; industry: string }, generationIndex: number) {
   const language = input.language;
-  const businessName = business.name.trim() || (language === 'ka' ? 'თქვენი ბიზნესი' : 'your business');
+  const businessName = input.businessType?.trim() || business.industry?.trim() || business.name.trim() || (language === 'ka' ? 'თქვენი ბიზნესი' : 'your business');
   const contentType = studioLabel('contentType', input.contentType, language).toLowerCase();
   const platform = studioLabel('platform', input.platform, language);
   const goal = studioLabel('goal', input.goal, language).toLowerCase();
   const tone = studioLabel('tone', input.tone, language).toLowerCase();
-  const variantSeed = businessName.length + input.contentType.length + input.platform.length + input.goal.length + input.tone.length;
+  const variantSeed = businessName.length + input.contentType.length + input.platform.length + input.goal.length + input.tone.length + generationIndex;
   const anglesEn = ['fresh value', 'customer favorite', 'limited-time moment', 'local story'];
   const anglesKa = ['ახალი ღირებულება', 'მომხმარებლის რჩეული', 'დროებითი შეთავაზება', 'ლოკალური ისტორია'];
   const angle = language === 'ka' ? anglesKa[variantSeed % anglesKa.length] : anglesEn[variantSeed % anglesEn.length];
@@ -304,7 +305,7 @@ app.post('/studio/generate', requireAuth, asyncHandler<AuthedRequest>(async (req
     return res.status(429).json({ message: 'You have reached this month’s DS Studio generation limit. Please try again next month.' });
   }
 
-  const content = generateStudioContent(input, business);
+  const content = generateStudioContent(input, business, generatedThisMonth);
   await prisma.studioGeneration.create({ data: { userId: req.userId!, businessId: business.id, contentType: input.contentType, platform: input.platform, language: input.language } });
   return res.json(content);
 }));
@@ -347,7 +348,7 @@ app.post('/social-accounts', requireAuth, asyncHandler<AuthedRequest>(async (req
   if (!business) return;
   const input = socialAccountSchema.parse(req.body);
   const isPrimary = input.isPrimary || (await prisma.socialAccount.count({ where: { businessId: business.id } })) === 0;
-  const socialAccount = await prisma.$transaction(async (tx) => {
+  const socialAccount = await prisma.$transaction(async (tx: typeof prisma) => {
     if (isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
     return tx.socialAccount.create({ data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary, businessId: business.id } });
   });
@@ -358,7 +359,7 @@ app.put('/social-accounts/:id', requireAuth, asyncHandler<AuthedRequest>(async (
   const business = await requireFirstBusiness(req.userId!, res);
   if (!business) return;
   const input = socialAccountSchema.parse(req.body);
-  const socialAccount = await prisma.$transaction(async (tx) => {
+  const socialAccount = await prisma.$transaction(async (tx: typeof prisma) => {
     if (input.isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
     return tx.socialAccount.update({ where: { id: req.params.id, businessId: business.id }, data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary: input.isPrimary } });
   });
