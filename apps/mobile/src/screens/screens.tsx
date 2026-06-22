@@ -47,7 +47,8 @@ function labelText(value: string) {
 }
 
 function localNoonTimestamp(value?: string) {
-  return value?.trim() ? new Date(`${value.trim()}T12:00:00`).toISOString() : undefined;
+  const key = value?.trim();
+  return key ? `${key}T12:00:00` : undefined;
 }
 
 
