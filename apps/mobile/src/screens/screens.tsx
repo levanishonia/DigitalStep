@@ -433,7 +433,8 @@ export function AnalyticsScreen() {
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getCampaigns>>['campaigns']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const load = useCallback(async () => { if (!token) return; setLoading(true); setError(''); try { const [taskData, contentData, campaignData] = await Promise.all([getTasks(token), getContentItems(token), getCampaigns(token)]); setTasks(taskData.tasks); setContentItems(contentData.contentItems); setCampaigns(campaignData.campaigns); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); } }, [token]);
+  const range = useMemo(() => ({ start: dateKey(addDaysToDate(startOfMonthDate(new Date()), -35)), end: dateKey(endOfMonthDate(new Date())) }), []);
+  const load = useCallback(async () => { if (!token) return; setLoading(true); setError(''); try { const [taskData, contentData, campaignData] = await Promise.all([getTasks(token, { startDate: range.start, endDate: range.end }), getContentItems(token, { startDate: range.start, endDate: range.end }), getCampaigns(token)]); setTasks(taskData.tasks); setContentItems(contentData.contentItems); setCampaigns(campaignData.campaigns); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); } }, [range.end, range.start, token]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const metrics = useMemo(() => buildAnalyticsMetrics(tasks, contentItems, campaigns), [campaigns, contentItems, tasks]);
   const empty = !tasks.length && !contentItems.length && !campaigns.length;
