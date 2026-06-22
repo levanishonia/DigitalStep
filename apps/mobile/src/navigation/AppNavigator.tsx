@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../auth/AuthContext';
 import { colors, useTheme } from '../theme/theme';
 import { useI18n } from '../i18n/i18n';
-import { AnalyticsScreen, BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, DSStudioScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, TemplatesScreen, RegisterScreen, SettingsScreen, TasksScreen, WelcomeScreen, WeeklyPlanScreen, MoreScreen } from '../screens/screens';
+import { AnalyticsScreen, BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, DSStudioScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, TemplatesScreen, RegisterScreen, SettingsScreen, SocialAccountsScreen, TasksScreen, WelcomeScreen, WeeklyPlanScreen, MoreScreen } from '../screens/screens';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -23,7 +23,7 @@ function HomeStack() { const { t } = useI18n(); return <Stack.Navigator screenOp
 function TasksStack() { const { t } = useI18n(); return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="TasksMain" component={TasksScreen} /></Stack.Navigator>; }
 function DSStudioStack() { return <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="DSStudioMain" component={DSStudioScreen} /></Stack.Navigator>; }
 function AnalyticsStack() { const { t } = useI18n(); return <Stack.Navigator><Stack.Screen name="AnalyticsMain" component={AnalyticsScreen} options={{ headerShown: false }} /><Stack.Screen name="Campaigns" component={CampaignsScreen} options={nestedOptions(t('nav.campaigns'))} /></Stack.Navigator>; }
-function MoreStack() { const { t } = useI18n(); return <Stack.Navigator><Stack.Screen name="MoreMain" component={MoreScreen} options={{ headerShown: false }} /><Stack.Screen name="Templates" component={TemplatesScreen} options={nestedOptions(t('nav.templates'))} /><Stack.Screen name="Tips" component={RecommendationsScreen} options={nestedOptions(t('nav.tips'))} /><Stack.Screen name="WeeklyPlan" component={WeeklyPlanScreen} options={nestedOptions(t('nav.weeklyPlanner'))} /><Stack.Screen name="Calendar" component={CalendarScreen} options={nestedOptions(t('nav.calendar'))} /><Stack.Screen name="ContentPlanner" component={PlannerScreen} options={nestedOptions(t('nav.contentPlanner'))} /><Stack.Screen name="Settings" component={SettingsScreen} options={nestedOptions(t('nav.settings'))} /></Stack.Navigator>; }
+function MoreStack() { const { t } = useI18n(); return <Stack.Navigator><Stack.Screen name="MoreMain" component={MoreScreen} options={{ headerShown: false }} /><Stack.Screen name="Templates" component={TemplatesScreen} options={nestedOptions(t('nav.templates'))} /><Stack.Screen name="Tips" component={RecommendationsScreen} options={nestedOptions(t('nav.tips'))} /><Stack.Screen name="WeeklyPlan" component={WeeklyPlanScreen} options={nestedOptions(t('nav.weeklyPlanner'))} /><Stack.Screen name="Calendar" component={CalendarScreen} options={nestedOptions(t('nav.calendar'))} /><Stack.Screen name="ContentPlanner" component={PlannerScreen} options={nestedOptions(t('nav.contentPlanner'))} /><Stack.Screen name="SocialAccounts" component={SocialAccountsScreen} options={nestedOptions('Social Accounts')} /><Stack.Screen name="Settings" component={SettingsScreen} options={nestedOptions(t('nav.settings'))} /></Stack.Navigator>; }
 
 function MainTabs() {
   useTheme();

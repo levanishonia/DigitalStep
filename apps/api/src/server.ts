@@ -62,6 +62,14 @@ const contentTypeSchema = z.enum(['post', 'story', 'reel', 'campaign', 'offer'])
 const contentStatusSchema = z.enum(['draft', 'planned', 'published']);
 const taskStatusSchema = z.enum(['todo', 'in_progress', 'done']);
 const taskPrioritySchema = z.enum(['low', 'medium', 'high']);
+const socialPlatformSchema = z.enum(['facebook', 'instagram', 'tiktok', 'linkedin', 'website', 'email_marketing']);
+const socialAccountSchema = z.object({
+  platform: socialPlatformSchema,
+  username: z.string().optional(),
+  url: z.string().url().optional().or(z.literal('')),
+  isPrimary: z.boolean().default(false),
+  isActive: z.boolean().default(true)
+});
 
 const studioContentTypeSchema = z.enum(['post', 'story', 'reel', 'promotion', 'announcement']);
 const studioPlatformSchema = z.enum(['facebook', 'instagram', 'website', 'email']);
@@ -303,14 +311,14 @@ app.post('/studio/generate', requireAuth, asyncHandler<AuthedRequest>(async (req
 
 app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const business = await firstBusiness(req.userId!);
-  if (!business) return res.json({ business: null, tasks: [], contentItems: [], campaigns: [], recommendations: [] });
+  if (!business) return res.json({ business: null, tasks: [], contentItems: [], campaigns: [], recommendations: [], socialAccounts: [] });
   const now = new Date();
   const startOfToday = new Date(now);
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date(now);
   endOfToday.setHours(23, 59, 59, 999);
 
-  const [tasks, contentItems, campaigns, recommendations] = await Promise.all([
+  const [tasks, contentItems, campaigns, recommendations, socialAccounts] = await Promise.all([
     prisma.task.findMany({
       where: { businessId: business.id, status: { not: 'done' }, dueDate: { gte: startOfToday, lte: endOfToday } },
       orderBy: { dueDate: 'asc' },
@@ -322,9 +330,46 @@ app.get('/dashboard', requireAuth, asyncHandler<AuthedRequest>(async (req, res) 
       take: 5
     }),
     prisma.campaign.findMany({ where: { businessId: business.id, status: 'active' }, orderBy: { createdAt: 'desc' }, take: 5 }),
-    prisma.recommendation.findMany({ where: { businessId: business.id }, orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }], take: 5 })
+    prisma.recommendation.findMany({ where: { businessId: business.id }, orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }], take: 5 }),
+    prisma.socialAccount.findMany({ where: { businessId: business.id, isActive: true }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] })
   ]);
-  return res.json({ business, tasks, contentItems, campaigns, recommendations });
+  return res.json({ business, tasks, contentItems, campaigns, recommendations, socialAccounts });
+}));
+
+
+app.get('/social-accounts', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await firstBusiness(req.userId!);
+  return res.json({ socialAccounts: business ? await prisma.socialAccount.findMany({ where: { businessId: business.id }, orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }] }) : [] });
+}));
+
+app.post('/social-accounts', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = socialAccountSchema.parse(req.body);
+  const isPrimary = input.isPrimary || (await prisma.socialAccount.count({ where: { businessId: business.id } })) === 0;
+  const socialAccount = await prisma.$transaction(async (tx) => {
+    if (isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
+    return tx.socialAccount.create({ data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary, businessId: business.id } });
+  });
+  return res.status(201).json({ socialAccount });
+}));
+
+app.put('/social-accounts/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = socialAccountSchema.parse(req.body);
+  const socialAccount = await prisma.$transaction(async (tx) => {
+    if (input.isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
+    return tx.socialAccount.update({ where: { id: req.params.id, businessId: business.id }, data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary: input.isPrimary } });
+  });
+  return res.json({ socialAccount });
+}));
+
+app.delete('/social-accounts/:id', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  await prisma.socialAccount.delete({ where: { id: req.params.id, businessId: business.id } });
+  return res.status(204).send();
 }));
 
 app.get('/tasks', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
