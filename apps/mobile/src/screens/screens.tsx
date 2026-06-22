@@ -6,7 +6,8 @@ import { useAuth } from '../auth/AuthContext';
 import { Screen, Button, Field, Row, ErrorMessage, Card, Badge, IconCircle, Skeleton } from '../components/UI';
 import { colors, useTheme } from '../theme/theme';
 import { disableDailyReminder, enableDailyReminder, loadReminderState, NotificationStatus, ReminderState, updateDailyReminderTime } from '../services/reminders';
-import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getCampaigns, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
+import { BusinessInput, Language, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getCampaigns, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateBusinessContentLanguage, updateContentItem, updateTask } from '../services/api';
+import { useI18n } from '../i18n/i18n';
 
 const channels: { label: string; value: MarketingChannel }[] = [
   { label: 'Instagram', value: 'instagram' },
@@ -15,6 +16,16 @@ const channels: { label: string; value: MarketingChannel }[] = [
   { label: 'Website', value: 'website' },
   { label: 'In store', value: 'in_store' }
 ];
+
+const languageOptions: { labelKey: 'language.georgian' | 'language.english'; value: Language }[] = [
+  { labelKey: 'language.georgian', value: 'ka' },
+  { labelKey: 'language.english', value: 'en' }
+];
+
+function LanguageChoice({ selected, onSelect }: { selected: Language; onSelect: (language: Language) => void }) {
+  const { t } = useI18n();
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{languageOptions.map((option) => <Chip key={option.value} label={t(option.labelKey)} value={option.value} selected={selected === option.value} onPress={onSelect} />)}</View>;
+}
 
 function cleanApiError(error: unknown) {
   const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
@@ -107,11 +118,13 @@ function useDashboard() {
 }
 
 export function WelcomeScreen({ navigation }: any) {
-  return <Screen centered title="DigitalStep" subtitle="A simple marketing manager for small businesses. Plan your next move, keep campaigns organized, and stay consistent."><Card><Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>Marketing clarity starts here.</Text><Text style={{ color: colors.muted, marginTop: 8, lineHeight: 20 }}>Create your account, set up your business, and start with a practical dashboard built for action.</Text></Card><Button label="Create account" onPress={() => navigation.navigate('Register')} /><Button secondary label="Log in" onPress={() => navigation.navigate('Login')} /></Screen>;
+  const { t } = useI18n();
+  return <Screen centered title="DigitalStep" subtitle={t('welcome.subtitle')}><Card><Text style={{ color: colors.text, fontWeight: '700', fontSize: 18 }}>{t('welcome.cardTitle')}</Text><Text style={{ color: colors.muted, marginTop: 8, lineHeight: 20 }}>{t('welcome.cardBody')}</Text></Card><Button label={t('auth.createAccount')} onPress={() => navigation.navigate('Register')} /><Button secondary label={t('auth.login')} onPress={() => navigation.navigate('Login')} /></Screen>;
 }
 
 export function LoginScreen() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -124,14 +137,16 @@ export function LoginScreen() {
     try { await login({ email: email.trim(), password }); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); }
   }
 
-  return <Screen title="Welcome back" subtitle="Log in to continue to your business setup and marketing dashboard."><Field placeholder="Email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} /><Field placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} /><ErrorMessage message={error} /><Button label="Log in" loading={loading} onPress={submit} /></Screen>;
+  return <Screen title="Welcome back" subtitle="Log in to continue to your business setup and marketing dashboard."><Field placeholder={t('auth.email')} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} /><Field placeholder={t('auth.password')} secureTextEntry value={password} onChangeText={setPassword} /><ErrorMessage message={error} /><Button label={t('auth.login')} loading={loading} onPress={submit} /></Screen>;
 }
 
 export function RegisterScreen() {
   const { register } = useAuth();
+  const { t, language, setLanguage } = useI18n();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [preferredLanguage, setPreferredLanguage] = useState<Language>(language);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -140,15 +155,16 @@ export function RegisterScreen() {
     if (!name.trim() || !email.trim() || !password) return setError('Fill out your name, email, and password.');
     if (password.length < 8) return setError('Password must be at least 8 characters.');
     setLoading(true);
-    try { await register({ name: name.trim(), email: email.trim(), password }); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); }
+    try { await register({ name: name.trim(), email: email.trim(), password, preferredLanguage }); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); }
   }
 
-  return <Screen title="Create account" subtitle="Start organizing your business marketing in minutes."><Field placeholder="Name" autoCapitalize="words" value={name} onChangeText={setName} /><Field placeholder="Email" autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} /><Field placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} /><ErrorMessage message={error} /><Button label="Create account" loading={loading} onPress={submit} /></Screen>;
+  return <Screen title={t('auth.createAccount')} subtitle={t('auth.subtitle')}><Text style={{ color: colors.text, fontWeight: '700' }}>{t('auth.chooseLanguage')}</Text><LanguageChoice selected={preferredLanguage} onSelect={(next) => { setPreferredLanguage(next); void setLanguage(next); }} /><Field placeholder={t('auth.name')} autoCapitalize="words" value={name} onChangeText={setName} /><Field placeholder={t('auth.email')} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" value={email} onChangeText={setEmail} /><Field placeholder={t('auth.password')} secureTextEntry value={password} onChangeText={setPassword} /><ErrorMessage message={error} /><Button label={t('auth.createAccount')} loading={loading} onPress={submit} /></Screen>;
 }
 
 export function BusinessOnboardingScreen({ navigation }: any) {
   const { completeBusinessOnboarding } = useAuth();
-  const [form, setForm] = useState<BusinessInput>({ name: '', industry: '', audience: '', location: '', primaryGoal: '', channels: [] });
+  const { t } = useI18n();
+  const [form, setForm] = useState<BusinessInput>({ name: '', industry: '', audience: '', location: '', primaryGoal: '', channels: [], contentLanguage: 'ka' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const canSubmit = form.name.trim() && form.industry.trim() && form.audience.trim() && form.primaryGoal.trim() && form.channels.length > 0;
@@ -169,7 +185,7 @@ export function BusinessOnboardingScreen({ navigation }: any) {
     }
   }
 
-  return <Screen title="Tell us about your business" subtitle="Set up your profile once, then jump into a dashboard built around your marketing work."><Field placeholder="Business name" value={form.name} onChangeText={(value) => update('name', value)} /><Field placeholder="Industry" value={form.industry} onChangeText={(value) => update('industry', value)} /><Field placeholder="Target audience" value={form.audience} onChangeText={(value) => update('audience', value)} /><Field placeholder="Location (optional)" value={form.location} onChangeText={(value) => update('location', value)} /><Field placeholder="Primary marketing goal" value={form.primaryGoal} onChangeText={(value) => update('primaryGoal', value)} /><Text style={{ color: colors.text, fontWeight: '700' }}>Marketing channels</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{channels.map((channel) => { const selected = form.channels.includes(channel.value); return <Pressable key={channel.value} onPress={() => toggleChannel(channel.value)} style={{ borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.card, paddingHorizontal: 13, paddingVertical: 10 }}><Text style={{ color: selected ? '#fff' : colors.text, fontWeight: '700' }}>{channel.label}</Text></Pressable>; })}</View><ErrorMessage message={error} /><Button label="Finish setup" loading={loading} disabled={!canSubmit} onPress={submit} /></Screen>;
+  return <Screen title={t('onboarding.title')} subtitle={t('onboarding.subtitle')}><Field placeholder={t('onboarding.businessName')} value={form.name} onChangeText={(value) => update('name', value)} /><Field placeholder={t('onboarding.industry')} value={form.industry} onChangeText={(value) => update('industry', value)} /><Field placeholder={t('onboarding.audience')} value={form.audience} onChangeText={(value) => update('audience', value)} /><Field placeholder={t('onboarding.location')} value={form.location} onChangeText={(value) => update('location', value)} /><Field placeholder={t('onboarding.goal')} value={form.primaryGoal} onChangeText={(value) => update('primaryGoal', value)} /><Text style={{ color: colors.text, fontWeight: '700' }}>{t('onboarding.channels')}</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{channels.map((channel) => { const selected = form.channels.includes(channel.value); return <Pressable key={channel.value} onPress={() => toggleChannel(channel.value)} style={{ borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.card, paddingHorizontal: 13, paddingVertical: 10 }}><Text style={{ color: selected ? '#fff' : colors.text, fontWeight: '700' }}>{channel.label}</Text></Pressable>; })}</View><Text style={{ color: colors.text, fontWeight: '700' }}>{t('language.content')}</Text><LanguageChoice selected={form.contentLanguage ?? 'ka'} onSelect={(contentLanguage) => setForm((current) => ({ ...current, contentLanguage }))} /><ErrorMessage message={error} /><Button label={t('onboarding.finish')} loading={loading} disabled={!canSubmit} onPress={submit} /></Screen>;
 }
 
 export function HomeScreen({ navigation }: any) {
@@ -492,13 +508,15 @@ export function RecommendationsScreen() {
   return <Screen title="Recommendations" subtitle="Practical suggestions based on your plan and schedule."><Section title="Actionable next steps">{recommendations.map((item) => <Row key={item.title} icon={item.icon} title={item.title} detail={item.detail} right={<Ionicons name="chevron-forward" size={18} color={colors.muted} />} />)}</Section></Screen>;
 }
 export function SettingsScreen() {
-  const { logout } = useAuth();
+  const { logout, token, user, updatePreferredLanguage } = useAuth();
+  const { t, language } = useI18n();
   const { isDark, toggleTheme } = useTheme();
   const { dashboard, loading, reload } = useDashboard();
   const business = dashboard?.business;
   const [reminder, setReminder] = useState<ReminderState>({ enabled: false, time: '09:00', notificationStatus: 'undetermined' });
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState('');
+  const [settingsNotice, setSettingsNotice] = useState('');
   const reminderTimes = ['08:00', '09:00', '12:00', '17:00'];
 
   useEffect(() => {
@@ -534,7 +552,10 @@ export function SettingsScreen() {
     }
   }
 
-  return <Screen title="Settings" subtitle="Manage account, business profile, and workspace preferences." refreshing={loading} onRefresh={reload}>{business ? <Section title="Business"><Row icon="business" title="Business Profile" detail={`${business.name} · ${business.industry}`} /><Row icon="location" title="Market" detail={`${business.audience}${business.location ? ` · ${business.location}` : ''}`} /><Row icon="share-social" title="Channels" detail={business.channels.map(labelChannel).join(', ')} /></Section> : <EmptyState icon="business" title="No business profile" detail="Complete onboarding to add your business details." />}<Section title="Preferences"><DailyReminderCard reminder={reminder} reminderTimes={reminderTimes} saving={reminderSaving} error={reminderError} onToggle={toggleReminder} onChangeTime={changeReminderTime} /><Pressable onPress={toggleTheme}><Row icon={isDark ? 'sunny' : 'moon'} title="Dark Mode" detail={isDark ? 'Low-light interface is enabled.' : 'Switch to a low-light interface.'} right={<Badge label={isDark ? 'On' : 'Off'} tone={isDark ? 'purple' : 'neutral'} />} /></Pressable><Row icon="card" title="Subscription" detail="Manage plan, billing, and premium features." /><Row icon="help-circle" title="Help & Support" detail="Get answers, contact support, and view guides." /></Section><Button secondary label="Logout" icon="log-out" onPress={logout} /></Screen>;
+  async function changeAppLanguage(next: Language) { setSettingsNotice(''); await updatePreferredLanguage(next); setSettingsNotice(t('settings.saved')); }
+  async function changeContentLanguage(next: Language) { if (!token) return; setSettingsNotice(''); await updateBusinessContentLanguage(next, token); setSettingsNotice(t('settings.saved')); await reload(); }
+
+  return <Screen title={t('nav.settings')} subtitle={t('settings.subtitle')} refreshing={loading} onRefresh={reload}>{settingsNotice ? <Card><Text style={{ color: colors.success, fontWeight: '800' }}>{settingsNotice}</Text></Card> : null}{business ? <Section title={t('settings.business')}><Row icon="business" title={t('settings.businessProfile')} detail={`${business.name} · ${business.industry}`} /><Row icon="location" title={t('settings.market')} detail={`${business.audience}${business.location ? ` · ${business.location}` : ''}`} /><Row icon="share-social" title={t('settings.channels')} detail={business.channels.map(labelChannel).join(', ')} /><Row icon="language" title={t('language.content')} detail={t(business.contentLanguage === 'en' ? 'language.english' : 'language.georgian')} right={<LanguageChoice selected={business.contentLanguage} onSelect={changeContentLanguage} />} /></Section> : <EmptyState icon="business" title={t('common.noBusiness')} detail={t('common.completeOnboarding')} />}<Section title={t('settings.preferences')}><Row icon="language" title={t('language.app')} detail={t(user?.preferredLanguage === 'en' ? 'language.english' : 'language.georgian')} right={<LanguageChoice selected={language} onSelect={changeAppLanguage} />} /><DailyReminderCard reminder={reminder} reminderTimes={reminderTimes} saving={reminderSaving} error={reminderError} onToggle={toggleReminder} onChangeTime={changeReminderTime} /><Pressable onPress={toggleTheme}><Row icon={isDark ? 'sunny' : 'moon'} title={t('settings.darkMode')} detail={isDark ? t('settings.darkOn') : t('settings.darkOff')} right={<Badge label={isDark ? t('settings.on') : t('settings.off')} tone={isDark ? 'purple' : 'neutral'} />} /></Pressable><Row icon="card" title={t('settings.subscription')} detail={t('settings.subscriptionDetail')} /><Row icon="help-circle" title={t('settings.help')} detail={t('settings.helpDetail')} /></Section><Button secondary label={t('settings.logout')} icon="log-out" onPress={logout} /></Screen>;
 }
 
 function DailyReminderCard({ reminder, reminderTimes, saving, error, onToggle, onChangeTime }: { reminder: ReminderState; reminderTimes: string[]; saving: boolean; error: string; onToggle: (enabled: boolean) => void; onChangeTime: (time: string) => void }) {

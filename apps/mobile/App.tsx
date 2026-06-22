@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/auth/AuthContext';
 import { ThemeProvider, useTheme } from './src/theme/theme';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { I18nProvider } from './src/i18n/i18n';
 
 function ThemedApp() {
   const { isDark, colors } = useTheme();
@@ -19,9 +20,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <AuthProvider>
-          <ThemedApp />
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <ThemedApp />
+          </AuthProvider>
+        </I18nProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

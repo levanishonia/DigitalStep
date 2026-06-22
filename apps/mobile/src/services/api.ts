@@ -1,6 +1,7 @@
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://digitalstepapi-production.up.railway.app';
 
-export type AuthUser = { id: string; name: string; email: string };
+export type Language = 'ka' | 'en';
+export type AuthUser = { id: string; name: string; email: string; preferredLanguage: Language };
 export type AuthResponse = { token: string; user: AuthUser };
 export type MarketingChannel = 'instagram' | 'facebook' | 'email' | 'website' | 'in_store';
 export type ContentType = 'post' | 'story' | 'reel' | 'campaign' | 'offer';
@@ -15,6 +16,7 @@ export type Business = {
   location?: string | null;
   primaryGoal: string;
   channels: MarketingChannel[];
+  contentLanguage: Language;
 };
 export type MeResponse = { user: AuthUser; businesses: Business[] };
 export type BusinessInput = {
@@ -24,6 +26,7 @@ export type BusinessInput = {
   location?: string;
   primaryGoal: string;
   channels: MarketingChannel[];
+  contentLanguage?: Language;
 };
 export type TaskInput = { title: string; description?: string; dueDate?: string; status: TaskStatus; priority: TaskPriority };
 export type Task = TaskInput & { id: string; description?: string | null; dueDate?: string | null };
@@ -61,7 +64,7 @@ export async function api<T>(path: string, options: RequestInit = {}, token?: st
   return body as T;
 }
 
-export function register(input: { name: string; email: string; password: string }) { return api<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(input) }); }
+export function register(input: { name: string; email: string; password: string; preferredLanguage?: Language }) { return api<AuthResponse>('/auth/register', { method: 'POST', body: JSON.stringify(input) }); }
 export function login(input: { email: string; password: string }) { return api<AuthResponse>('/auth/login', { method: 'POST', body: JSON.stringify(input) }); }
 export function getMe(token: string) { return api<MeResponse>('/me', {}, token); }
 export function getBusinesses(token: string) { return api<{ businesses: Business[] }>('/businesses', {}, token); }
@@ -95,3 +98,6 @@ export function deleteContentItem(id: string, token: string) { return api<void>(
 export function getCalendar(token: string, startDate: string, endDate: string) { return api<CalendarResponse>(`/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`, {}, token); }
 export function getWeeklyPlan(token: string, weekStart?: string) { return api<WeeklyPlanResponse>(`/weekly-plan${weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : ''}`, {}, token); }
 export function acceptWeeklyPlan(input: AcceptWeeklyPlanInput, token: string) { return api<{ tasksCreated: number; contentItemsCreated: number }>('/weekly-plan/accept', { method: 'POST', body: JSON.stringify(input) }, token); }
+
+export function updatePreferredLanguage(preferredLanguage: Language, token: string) { return api<{ user: AuthUser }>('/me/language', { method: 'PUT', body: JSON.stringify({ preferredLanguage }) }, token); }
+export function updateBusinessContentLanguage(contentLanguage: Language, token: string) { return api<{ business: Business }>('/businesses/current/content-language', { method: 'PUT', body: JSON.stringify({ contentLanguage }) }, token); }
