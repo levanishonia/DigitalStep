@@ -222,6 +222,105 @@ const taskPriorities: TaskPriority[] = ['low', 'medium', 'high'];
 const contentStatuses: ContentStatus[] = ['draft', 'planned', 'published'];
 const contentTypes: ContentType[] = ['post', 'story', 'reel', 'campaign', 'offer'];
 
+
+type StudioContentType = 'post' | 'story' | 'reel' | 'promotion' | 'announcement';
+type StudioPlatform = 'facebook' | 'instagram' | 'website' | 'email';
+type StudioGoal = 'sales' | 'awareness' | 'engagement';
+type StudioTone = 'professional' | 'friendly' | 'luxury' | 'funny';
+type GeneratedContent = { title: string; mainText: string; cta: string; hashtags: string[]; visualIdea: string };
+
+type StudioForm = { businessType: string; contentType: StudioContentType; platform: StudioPlatform; goal: StudioGoal; tone: StudioTone; language: Language };
+
+const studioContentTypes: StudioContentType[] = ['post', 'story', 'reel', 'promotion', 'announcement'];
+const studioPlatforms: StudioPlatform[] = ['facebook', 'instagram', 'website', 'email'];
+const studioGoals: StudioGoal[] = ['sales', 'awareness', 'engagement'];
+const studioTones: StudioTone[] = ['professional', 'friendly', 'luxury', 'funny'];
+
+const studioEn = {
+  contentType: { post: 'Post', story: 'Story', reel: 'Reel', promotion: 'Promotion', announcement: 'Announcement' },
+  platform: { facebook: 'Facebook', instagram: 'Instagram', website: 'Website', email: 'Email' },
+  goal: { sales: 'Sales', awareness: 'Awareness', engagement: 'Engagement' },
+  tone: { professional: 'Professional', friendly: 'Friendly', luxury: 'Luxury', funny: 'Funny' }
+};
+const studioKa = {
+  contentType: { post: 'პოსტი', story: 'სთორი', reel: 'რილი', promotion: 'პრომოცია', announcement: 'განცხადება' },
+  platform: { facebook: 'Facebook', instagram: 'Instagram', website: 'ვებსაიტი', email: 'ელფოსტა' },
+  goal: { sales: 'გაყიდვები', awareness: 'ცნობადობა', engagement: 'ჩართულობა' },
+  tone: { professional: 'პროფესიული', friendly: 'მეგობრული', luxury: 'ლუქსი', funny: 'სახალისო' }
+};
+
+function studioLabel(group: keyof typeof studioEn, value: string, language: Language) {
+  const labels = language === 'ka' ? studioKa : studioEn;
+  return (labels[group] as Record<string, string>)[value] ?? value;
+}
+
+function generateStudioContent(form: StudioForm, variant = 0): GeneratedContent {
+  const language = form.language;
+  const business = form.businessType.trim() || (language === 'ka' ? 'თქვენი ბიზნესი' : 'your business');
+  const contentType = studioLabel('contentType', form.contentType, language).toLowerCase();
+  const platform = studioLabel('platform', form.platform, language);
+  const goal = studioLabel('goal', form.goal, language).toLowerCase();
+  const tone = studioLabel('tone', form.tone, language).toLowerCase();
+  const anglesEn = ['fresh value', 'customer favorite', 'limited-time moment', 'local story'];
+  const anglesKa = ['ახალი ღირებულება', 'მომხმარებლის რჩეული', 'დროებითი შეთავაზება', 'ლოკალური ისტორია'];
+  const angle = language === 'ka' ? anglesKa[variant % anglesKa.length] : anglesEn[variant % anglesEn.length];
+  if (language === 'ka') {
+    const goalLine = form.goal === 'sales' ? 'შეარჩიეთ დღეს და მიიღეთ შედეგი სწრაფად.' : form.goal === 'awareness' ? 'გაიცანით ჩვენი მიდგომა და ის, რაც გამოგვარჩევს.' : 'დაგვიწერეთ კომენტარში, რა გჭირდებათ ყველაზე მეტად.';
+    const toneLine = form.tone === 'luxury' ? 'დეტალებზე ორიენტირებული, დახვეწილი გამოცდილება გელოდებათ.' : form.tone === 'funny' ? 'ცოტა ღიმილი, ბევრი სარგებელი — ასე ვაკეთებთ საქმეს.' : form.tone === 'friendly' ? 'მეგობრულად გიზიარებთ იდეას, რომელიც თქვენს დღეს გაამარტივებს.' : 'პროფესიული გადაწყვეტა თქვენი შემდეგი ნაბიჯისთვის.';
+    return {
+      title: `${business}: ${angle}`,
+      mainText: `${business} გთავაზობთ ${contentType}-ს ${platform}-ისთვის. ${toneLine} მიზანი: ${goal}. ${goalLine}`,
+      cta: form.goal === 'sales' ? 'შეგვეხმიანეთ შესაძენად' : form.goal === 'awareness' ? 'გაიგეთ მეტი ჩვენ შესახებ' : 'დაგვიტოვეთ კომენტარი',
+      hashtags: ['#DigitalStep', '#ქართულიBიზნესი', `#${business.replace(/\s+/g, '')}`, form.goal === 'sales' ? '#შეთავაზება' : '#მარკეტინგი'],
+      visualIdea: `${tone} ვიზუალი: პროდუქტის/სერვისის ახლო კადრი, ბრენდის ფერები და მოკლე ტექსტი „${angle}“. `
+    };
+  }
+  const goalLine = form.goal === 'sales' ? 'Make it easy to choose today with a clear next step.' : form.goal === 'awareness' ? 'Show what makes the brand memorable and trustworthy.' : 'Invite people to comment, save, or share their preference.';
+  const toneLine = form.tone === 'luxury' ? 'Polished details and a premium feel set the scene.' : form.tone === 'funny' ? 'A light punchline keeps the message memorable.' : form.tone === 'friendly' ? 'A warm, helpful note makes the offer feel personal.' : 'A clear, confident message keeps the focus on value.';
+  return {
+    title: `${business}: ${angle}`,
+    mainText: `${business} is preparing a ${contentType} for ${platform}. ${toneLine} The goal is ${goal}. ${goalLine}`,
+    cta: form.goal === 'sales' ? 'Message us to order' : form.goal === 'awareness' ? 'Learn more today' : 'Comment with your choice',
+    hashtags: ['#DigitalStep', '#SmallBusinessMarketing', `#${business.replace(/\s+/g, '')}`, form.goal === 'sales' ? '#SpecialOffer' : '#MarketingTips'],
+    visualIdea: `${tone} visual: close-up product or service moment, brand colors, and a short overlay reading “${angle}”.`
+  };
+}
+
+
+function StudioChoiceRow<T extends string>({ options, selected, onSelect, labels }: { options: readonly T[]; selected: T; onSelect: (value: T) => void; labels: Record<string, string> }) {
+  return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{options.map((option) => <Chip key={option} label={labels[option] ?? labelText(option)} value={option} selected={selected === option} onPress={onSelect} />)}</View>;
+}
+
+function studioContentToPlannerType(type: StudioContentType): ContentType {
+  if (type === 'promotion') return 'offer';
+  if (type === 'announcement') return 'campaign';
+  return type;
+}
+
+function generatedAsText(content: GeneratedContent) {
+  return `${content.title}\n\n${content.mainText}\n\nCTA: ${content.cta}\n\n${content.hashtags.join(' ')}\n\nVisual idea: ${content.visualIdea}`;
+}
+
+async function copyGeneratedText(text: string) {
+  const nav = globalThis.navigator as Navigator & { clipboard?: { writeText?: (value: string) => Promise<void> } };
+  if (nav?.clipboard?.writeText) await nav.clipboard.writeText(text);
+}
+
+export function DSStudioScreen() {
+  const { token } = useAuth();
+  const { t, language } = useI18n();
+  const [form, setForm] = useState<StudioForm>({ businessType: '', contentType: 'post', platform: 'instagram', goal: 'sales', tone: 'friendly', language });
+  const [generated, setGenerated] = useState<GeneratedContent | null>(null);
+  const [variant, setVariant] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  useEffect(() => { setForm((current) => ({ ...current, language })); }, [language]);
+  function generate(nextVariant = variant) { setNotice(''); const content = generateStudioContent(form, nextVariant); setGenerated(content); setVariant(nextVariant + 1); }
+  async function copyText() { if (!generated) return; await copyGeneratedText(generatedAsText(generated)); setNotice(form.language === 'ka' ? 'ტექსტი მზად არის დასაკოპირებლად.' : 'Generated text copied.'); }
+  async function save(status: ContentStatus) { if (!token || !generated) return; setSaving(true); setNotice(''); try { await createContentItem({ title: generated.title, description: generatedAsText(generated), type: studioContentToPlannerType(form.contentType), channel: form.platform, status, publishDate: status === 'planned' ? localNoonTimestamp(dateKey(new Date())) : undefined }, token); setNotice(status === 'planned' ? (form.language === 'ka' ? 'დაემატა კონტენტის გეგმაში.' : 'Saved to planner.') : (form.language === 'ka' ? 'შენახულია შავ ვერსიად.' : 'Saved as draft.')); } catch (err) { setNotice(cleanApiError(err)); } finally { setSaving(false); } }
+  return <Screen title="DS Studio" subtitle={form.language === 'ka' ? 'შექმენით მარკეტინგული ტექსტი წესებზე დაფუძნებული გენერატორით.' : 'Generate ready-to-use marketing content with a rule-based studio.'}><Card elevated><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><IconCircle name="sparkles" size={24} background={colors.purpleSoft} color={colors.purple} /><View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '900', fontSize: 20 }}>AI Content Generator</Text><Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>{form.language === 'ka' ? 'Mock generator — გარე AI API ჯერ არ გამოიყენება.' : 'Mock generator — no external AI API is used yet.'}</Text></View><Badge label={form.language === 'ka' ? 'ქართული' : 'English'} tone="purple" /></View></Card><Section title={form.language === 'ka' ? 'კონტენტის პარამეტრები' : 'Content settings'}><Field placeholder={form.language === 'ka' ? 'ბიზნესის ტიპი (მაგ. კაფე, სალონი)' : 'Business type (e.g. cafe, salon)'} value={form.businessType} onChangeText={(businessType) => setForm((current) => ({ ...current, businessType }))} /><Text style={{ color: colors.text, fontWeight: '700' }}>{t('language.content')}</Text><LanguageChoice selected={form.language} onSelect={(nextLanguage) => setForm((current) => ({ ...current, language: nextLanguage }))} /><Text style={{ color: colors.text, fontWeight: '700' }}>{form.language === 'ka' ? 'კონტენტის ტიპი' : 'Content type'}</Text><StudioChoiceRow options={studioContentTypes} selected={form.contentType} labels={(form.language === 'ka' ? studioKa : studioEn).contentType} onSelect={(contentType) => setForm((current) => ({ ...current, contentType }))} /><Text style={{ color: colors.text, fontWeight: '700' }}>{form.language === 'ka' ? 'პლატფორმა' : 'Platform'}</Text><StudioChoiceRow options={studioPlatforms} selected={form.platform} labels={(form.language === 'ka' ? studioKa : studioEn).platform} onSelect={(platform) => setForm((current) => ({ ...current, platform }))} /><Text style={{ color: colors.text, fontWeight: '700' }}>{form.language === 'ka' ? 'მიზანი' : 'Goal'}</Text><StudioChoiceRow options={studioGoals} selected={form.goal} labels={(form.language === 'ka' ? studioKa : studioEn).goal} onSelect={(goal) => setForm((current) => ({ ...current, goal }))} /><Text style={{ color: colors.text, fontWeight: '700' }}>{form.language === 'ka' ? 'ტონი' : 'Tone'}</Text><StudioChoiceRow options={studioTones} selected={form.tone} labels={(form.language === 'ka' ? studioKa : studioEn).tone} onSelect={(tone) => setForm((current) => ({ ...current, tone }))} /><Button label={form.language === 'ka' ? 'გენერაცია' : 'Generate'} icon="sparkles" onPress={() => generate()} /></Section>{notice ? <Card><Text style={{ color: notice.includes('wrong') || notice.includes('შეცდომ') ? colors.danger : colors.success, fontWeight: '800' }}>{notice}</Text></Card> : null}{generated ? <Section title={form.language === 'ka' ? 'გენერირებული კონტენტი' : 'Generated content'} action={<Button secondary icon="refresh" label={form.language === 'ka' ? 'ხელახლა' : 'Regenerate'} onPress={() => generate(variant)} />}><Card elevated><Text style={{ color: colors.muted, fontWeight: '900' }}>{form.language === 'ka' ? 'სათაური' : 'Title'}</Text><Text style={{ color: colors.text, fontWeight: '900', fontSize: 22, marginTop: 6 }}>{generated.title}</Text><Text style={{ color: colors.muted, fontWeight: '900', marginTop: 16 }}>{form.language === 'ka' ? 'მთავარი ტექსტი / Caption' : 'Main text / caption'}</Text><Text style={{ color: colors.text, lineHeight: 22, marginTop: 6 }}>{generated.mainText}</Text><Text style={{ color: colors.muted, fontWeight: '900', marginTop: 16 }}>CTA</Text><Text style={{ color: colors.primaryDark, fontWeight: '900', marginTop: 6 }}>{generated.cta}</Text><Text style={{ color: colors.muted, fontWeight: '900', marginTop: 16 }}>{form.language === 'ka' ? 'ჰეშთეგები' : 'Suggested hashtags'}</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>{generated.hashtags.map((tag) => <Badge key={tag} label={tag} tone="info" />)}</View><Text style={{ color: colors.muted, fontWeight: '900', marginTop: 16 }}>{form.language === 'ka' ? 'ვიზუალური იდეა' : 'Visual idea'}</Text><Text style={{ color: colors.text, lineHeight: 22, marginTop: 6 }}>{generated.visualIdea}</Text></Card><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary icon="copy" label={form.language === 'ka' ? 'კოპირება' : 'Copy text'} onPress={copyText} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary icon="calendar" label={form.language === 'ka' ? 'გეგმაში' : 'Save to planner'} loading={saving} onPress={() => save('planned')} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary icon="document-text" label={form.language === 'ka' ? 'შავ ვერსიად' : 'Save as draft'} loading={saving} onPress={() => save('draft')} /></View></View></Section> : <EmptyState icon="sparkles" title={form.language === 'ka' ? 'დაიწყეთ გენერაცია' : 'Start generating'} detail={form.language === 'ka' ? 'აირჩიეთ პარამეტრები და მიიღეთ სათაური, ტექსტი, CTA, ჰეშთეგები და ვიზუალური იდეა.' : 'Choose the settings to get a title, caption, CTA, hashtags, and visual idea.'} />}</Screen>;
+}
+
 export function TasksScreen() {
   const { token } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -526,6 +625,8 @@ export function RecommendationsScreen() {
 export function MoreScreen({ navigation }: any) {
   const { t } = useI18n();
   const items = [
+    { route: 'WeeklyPlan', icon: 'calendar' as IconName, title: t('nav.weeklyPlanner'), detail: t('more.weeklyPlannerDetail') },
+    { route: 'ContentPlanner', icon: 'images' as IconName, title: t('nav.contentPlanner'), detail: t('more.contentPlannerDetail') },
     { route: 'Templates', icon: 'library' as IconName, title: t('nav.templates'), detail: t('more.templatesDetail') },
     { route: 'Tips', icon: 'bulb' as IconName, title: t('nav.tips'), detail: t('more.tipsDetail') },
     { route: 'Settings', icon: 'settings' as IconName, title: t('nav.settings'), detail: t('more.settingsDetail') },
