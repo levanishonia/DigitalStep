@@ -48,6 +48,15 @@ enum CampaignStatus {
   completed
 }
 
+enum SocialPlatform {
+  facebook
+  instagram
+  tiktok
+  linkedin
+  website
+  email_marketing
+}
+
 model User {
   id           String     @id @default(cuid())
   name         String
@@ -76,6 +85,7 @@ model Business {
   campaigns       Campaign[]
   recommendations Recommendation[]
   studioGenerations StudioGeneration[]
+  socialAccounts SocialAccount[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -133,6 +143,21 @@ model Recommendation {
   updatedAt   DateTime @updatedAt
 }
 
+
+model SocialAccount {
+  id         String         @id @default(cuid())
+  businessId String
+  business   Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  platform   SocialPlatform
+  username   String?
+  url        String?
+  isPrimary  Boolean        @default(false)
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+
+  @@unique([businessId, platform])
+  @@index([businessId])
+}
 
 model StudioGeneration {
   id          String      @id @default(cuid())

@@ -4,6 +4,7 @@ export type Language = 'ka' | 'en';
 export type AuthUser = { id: string; name: string; email: string; preferredLanguage: Language };
 export type AuthResponse = { token: string; user: AuthUser };
 export type MarketingChannel = 'instagram' | 'facebook' | 'email' | 'website' | 'in_store';
+export type SocialPlatform = 'facebook' | 'instagram' | 'tiktok' | 'linkedin' | 'website' | 'email_marketing';
 export type ContentType = 'post' | 'story' | 'reel' | 'campaign' | 'offer';
 export type ContentStatus = 'draft' | 'planned' | 'published';
 export type TaskStatus = 'todo' | 'in_progress' | 'done';
@@ -34,7 +35,9 @@ export type ContentItemInput = { title: string; description?: string; type: Cont
 export type ContentItem = ContentItemInput & { id: string; description?: string | null; publishDate?: string | null; scheduledFor?: string | null; notes?: string | null };
 export type Campaign = { id: string; name: string; objective: string; status: 'planned' | 'active' | 'paused' | 'completed'; startDate?: string | null; endDate?: string | null };
 export type Recommendation = { id: string; title: string; description: string; priority: number };
-export type DashboardResponse = { business: Business | null; tasks: Task[]; contentItems: ContentItem[]; campaigns: Campaign[]; recommendations: Recommendation[] };
+export type SocialAccountInput = { platform: SocialPlatform; username?: string; url?: string; isPrimary: boolean; isActive: boolean };
+export type SocialAccount = SocialAccountInput & { id: string; businessId: string; username?: string | null; url?: string | null; createdAt: string };
+export type DashboardResponse = { business: Business | null; tasks: Task[]; contentItems: ContentItem[]; campaigns: Campaign[]; recommendations: Recommendation[]; socialAccounts: SocialAccount[] };
 export type CalendarResponse = { tasks: Task[]; contentItems: ContentItem[] };
 export type GeneratedPlanTask = { id: string; day: string; title: string; description: string; dueDate: string; priority: TaskPriority };
 export type GeneratedPlanContent = { id: string; day: string; title: string; description: string; type: ContentType; channel: MarketingChannel; publishDate: string };
@@ -96,6 +99,10 @@ export function getContentItems(token: string, filters: { status?: ContentStatus
 export function createContentItem(input: ContentItemInput, token: string) { return api<{ contentItem: ContentItem }>('/content-items', { method: 'POST', body: JSON.stringify(input) }, token); }
 export function updateContentItem(id: string, input: ContentItemInput, token: string) { return api<{ contentItem: ContentItem }>(`/content-items/${id}`, { method: 'PUT', body: JSON.stringify(input) }, token); }
 export function deleteContentItem(id: string, token: string) { return api<void>(`/content-items/${id}`, { method: 'DELETE' }, token); }
+export function getSocialAccounts(token: string) { return api<{ socialAccounts: SocialAccount[] }>('/social-accounts', {}, token); }
+export function createSocialAccount(input: SocialAccountInput, token: string) { return api<{ socialAccount: SocialAccount }>('/social-accounts', { method: 'POST', body: JSON.stringify(input) }, token); }
+export function updateSocialAccount(id: string, input: SocialAccountInput, token: string) { return api<{ socialAccount: SocialAccount }>(`/social-accounts/${id}`, { method: 'PUT', body: JSON.stringify(input) }, token); }
+export function deleteSocialAccount(id: string, token: string) { return api<void>(`/social-accounts/${id}`, { method: 'DELETE' }, token); }
 
 export function getCalendar(token: string, startDate: string, endDate: string) { return api<CalendarResponse>(`/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`, {}, token); }
 export function getWeeklyPlan(token: string, weekStart?: string) { return api<WeeklyPlanResponse>(`/weekly-plan${weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : ''}`, {}, token); }
