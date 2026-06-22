@@ -2,7 +2,8 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
-import { ApiError, AuthResponse, AuthUser, BusinessInput, createBusiness, getMe, login as loginRequest, register as registerRequest } from '../services/api';
+import { ApiError, AuthResponse, AuthUser, BusinessInput, Language, createBusiness, getMe, login as loginRequest, register as registerRequest, updatePreferredLanguage as updatePreferredLanguageRequest } from '../services/api';
+import { useI18n } from '../i18n/i18n';
 
 const TOKEN_KEY = 'digitalstep.authToken';
 
@@ -13,7 +14,8 @@ type AuthContextValue = {
   user: AuthUser | null;
   hasBusiness: boolean | null;
   login: (input: { email: string; password: string }) => Promise<void>;
-  register: (input: { name: string; email: string; password: string }) => Promise<void>;
+  register: (input: { name: string; email: string; password: string; preferredLanguage?: Language }) => Promise<void>;
+  updatePreferredLanguage: (language: Language) => Promise<void>;
   completeBusinessOnboarding: (input: BusinessInput) => Promise<void>;
   refreshBusinessStatus: () => Promise<void>;
   logout: () => Promise<void>;
@@ -49,6 +51,7 @@ function isStaleStoredAuthError(error: unknown) {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { setLanguage } = useI18n();
   const [isInitializing, setIsInitializing] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -63,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const me = await getMe(storedToken);
         setToken(storedToken);
         setUser(me.user);
+        await setLanguage(me.user.preferredLanguage);
         setHasBusiness(me.businesses.length > 0);
       } catch (error) {
         if (isStaleStoredAuthError(error)) {
@@ -91,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await getMe(response.token);
       setToken(response.token);
       setUser(me.user);
+      await setLanguage(me.user.preferredLanguage);
       setHasBusiness(me.businesses.length > 0);
     },
     async register(input) {
@@ -98,7 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await persistAuth(response);
       setToken(response.token);
       setUser(response.user);
+      await setLanguage(response.user.preferredLanguage);
       setHasBusiness(false);
+    },
+    async updatePreferredLanguage(language) {
+      if (!token) throw new Error('You must be logged in to update language.');
+      await setLanguage(language);
+      const response = await updatePreferredLanguageRequest(language, token);
+      setUser(response.user);
     },
     async completeBusinessOnboarding(input) {
       if (!token) throw new Error('You must be logged in to create a business.');
@@ -109,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!token) return;
       const me = await getMe(token);
       setUser(me.user);
+      await setLanguage(me.user.preferredLanguage);
       setHasBusiness(me.businesses.length > 0);
     },
     async logout() {
@@ -117,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setHasBusiness(null);
     }
-  }), [hasBusiness, isInitializing, token, user]);
+  }), [hasBusiness, isInitializing, setLanguage, token, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -36,8 +36,8 @@ function signToken(userId: string) {
   return jwt.sign({ sub: userId }, jwtSecret, { expiresIn: '30d' });
 }
 
-function publicUser(user: { id: string; name: string; email: string }) {
-  return { id: user.id, name: user.name, email: user.email };
+function publicUser(user: { id: string; name: string; email: string; preferredLanguage?: string }) {
+  return { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferredLanguage === 'en' ? 'en' : 'ka' };
 }
 
 function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
@@ -54,7 +54,8 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   }
 }
 
-const registerSchema = z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(8) });
+const languageSchema = z.enum(['ka', 'en']);
+const registerSchema = z.object({ name: z.string().min(2), email: z.string().email(), password: z.string().min(8), preferredLanguage: languageSchema.default('ka') });
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const channelSchema = z.enum(['instagram', 'facebook', 'email', 'website', 'in_store']);
 const contentTypeSchema = z.enum(['post', 'story', 'reel', 'campaign', 'offer']);
@@ -71,7 +72,8 @@ const businessSchema = z.object({
   audience: z.string().min(2),
   location: z.string().optional(),
   primaryGoal: z.string().min(2),
-  channels: z.array(channelSchema).min(1)
+  channels: z.array(channelSchema).min(1),
+  contentLanguage: languageSchema.default('ka')
 });
 
 const contentItemSchema = z.object({
@@ -96,7 +98,7 @@ app.get('/health', (_req, res) => res.json({ ok: true, service: 'digitalstep-api
 app.post('/auth/register', asyncHandler(async (req, res) => {
   const input = registerSchema.parse(req.body);
   const passwordHash = await bcrypt.hash(input.password, 10);
-  const user = await prisma.user.create({ data: { name: input.name, email: input.email.toLowerCase(), passwordHash } });
+  const user = await prisma.user.create({ data: { name: input.name, email: input.email.toLowerCase(), passwordHash, preferredLanguage: input.preferredLanguage } });
   return res.status(201).json({ token: signToken(user.id), user: publicUser(user) });
 }));
 
@@ -113,6 +115,13 @@ app.get('/me', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId }, include: { businesses: true } });
   if (!user) return res.status(404).json({ message: 'User not found' });
   return res.json({ user: publicUser(user), businesses: user.businesses });
+}));
+
+
+app.put('/me/language', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const input = z.object({ preferredLanguage: languageSchema }).parse(req.body);
+  const user = await prisma.user.update({ where: { id: req.userId }, data: { preferredLanguage: input.preferredLanguage } });
+  return res.json({ user: publicUser(user) });
 }));
 
 app.get('/businesses', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
@@ -145,6 +154,14 @@ app.post('/businesses', requireAuth, asyncHandler<AuthedRequest>(async (req, res
   return res.status(201).json({ business });
 }));
 
+
+app.put('/businesses/current/content-language', requireAuth, asyncHandler<AuthedRequest>(async (req, res) => {
+  const business = await requireFirstBusiness(req.userId!, res);
+  if (!business) return;
+  const input = z.object({ contentLanguage: languageSchema }).parse(req.body);
+  const updated = await prisma.business.update({ where: { id: business.id }, data: { contentLanguage: input.contentLanguage } });
+  return res.json({ business: updated });
+}));
 
 function dayRangeFromQuery(start?: unknown, end?: unknown) {
   const startDate = typeof start === 'string' && start ? new Date(`${start}T00:00:00`) : undefined;
@@ -376,6 +393,7 @@ function preferredChannel(channels: string[], preferred: string[]) {
 
 function generateMarketingPlan(business: Awaited<ReturnType<typeof firstBusiness>>, weekStart: Date): GeneratedWeeklyPlan {
   if (!business) throw new Error('Business is required');
+  const useGeorgian = business.contentLanguage !== 'en';
   const templateKey = normalizeIndustry(business.industry);
   const template = marketingTemplates[templateKey];
   const channels = business.channels as string[];
@@ -385,13 +403,13 @@ function generateMarketingPlan(business: Awaited<ReturnType<typeof firstBusiness
     const channel = index === 1 ? preferredChannel(channels, ['instagram', 'facebook']) : index === 2 ? preferredChannel(channels, ['email', 'in_store', 'website', 'facebook', 'instagram']) : preferredChannel(channels, ['instagram', 'facebook', 'website', 'email', 'in_store']);
     const date = addDays(weekStart, contentDays[index]);
     const location = business.location ? ` in ${business.location}` : '';
-    return { id: `content-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: `${template.label}: ${theme}`, description: `For ${business.audience}${location}, connect this ${theme} to the goal: ${business.primaryGoal}.`, type: (index === 1 ? 'story' : index === 2 ? 'offer' : 'post') as GeneratedPlanContent['type'], channel, publishDate: dateKey(date) };
+    return { id: `content-${index + 1}`, day: date.toLocaleDateString(useGeorgian ? 'ka-GE' : 'en-US', { weekday: 'long' }), title: useGeorgian ? `${business.industry}: ${theme}` : `${template.label}: ${theme}`, description: useGeorgian ? `${business.audience}${location ? ` (${business.location})` : ''} აუდიტორიისთვის დაუკავშირეთ ეს იდეა მიზანს: ${business.primaryGoal}.` : `For ${business.audience}${location}, connect this ${theme} to the goal: ${business.primaryGoal}.`, type: (index === 1 ? 'story' : index === 2 ? 'offer' : 'post') as GeneratedPlanContent['type'], channel, publishDate: dateKey(date) };
   });
   const tasks = template.taskThemes.concat([{ title: 'Review weekly performance', description: 'Check engagement, inquiries, reviews, and completed tasks. Decide what to repeat next week.', priority: 'low' as const }]).map((task, index) => {
     const date = addDays(weekStart, [0, 2, 4, 6][index] ?? index);
-    return { id: `task-${index + 1}`, day: date.toLocaleDateString('en-US', { weekday: 'long' }), title: task.title, description: task.description, dueDate: dateKey(date), priority: task.priority };
+    return { id: `task-${index + 1}`, day: date.toLocaleDateString(useGeorgian ? 'ka-GE' : 'en-US', { weekday: 'long' }), title: useGeorgian ? task.title.replace('Update', 'განაახლეთ').replace('Collect', 'შეაგროვეთ').replace('Follow up', 'დაუკავშირდით').replace('Review', 'გადახედეთ') : task.title, description: useGeorgian ? `${task.description} იმოქმედეთ მოკლედ, მკაფიოდ და ბიზნეს მიზანზე მორგებულად.` : task.description, dueDate: dateKey(date), priority: task.priority };
   });
-  return { industryTemplate: template.label, weekStart: dateKey(weekStart), weekEnd: dateKey(weekEnd), focus: `This week, focus on ${template.focus} for ${business.audience}.`, tasks, contentItems };
+  return { industryTemplate: useGeorgian ? business.industry : template.label, weekStart: dateKey(weekStart), weekEnd: dateKey(weekEnd), focus: useGeorgian ? `ამ კვირაში მთავარი ფოკუსია ${business.audience} აუდიტორიასთან მიზანმიმართული კომუნიკაცია და მიზანი: ${business.primaryGoal}.` : `This week, focus on ${template.focus} for ${business.audience}.`, tasks, contentItems };
 }
 
 const generatedTaskSchema = z.object({ title: z.string().min(1), description: z.string().optional(), dueDate: z.coerce.date(), priority: taskPrioritySchema });
