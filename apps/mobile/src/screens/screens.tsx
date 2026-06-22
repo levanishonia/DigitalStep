@@ -273,7 +273,7 @@ export function TemplatesScreen({ navigation }: any) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const activeIndustry = industry === 'business' ? businessIndustry : industry;
-  const templates = contentTemplates.filter((template) => (category === 'all' || template.category === category) && (channel === 'all' || template.channel === channel) && (activeIndustry === 'all' || template.industries.includes('all') || template.industries.includes(activeIndustry)));
+  const templates = contentTemplates.filter((template) => (category === 'all' || template.category === category) && (channel === 'all' || template.channel === channel) && (activeIndustry === 'all' || template.industries.includes(activeIndustry)));
   async function useTemplate(template: ContentTemplate) {
     if (!token) return;
     setSavingId(template.id); setError(''); setNotice('');
