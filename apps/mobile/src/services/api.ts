@@ -67,6 +67,7 @@ export function getMe(token: string) { return api<MeResponse>('/me', {}, token);
 export function getBusinesses(token: string) { return api<{ businesses: Business[] }>('/businesses', {}, token); }
 export function createBusiness(input: BusinessInput, token: string) { return api<{ business: Business }>('/businesses', { method: 'POST', body: JSON.stringify(input) }, token); }
 export function getDashboard(token: string) { return api<DashboardResponse>('/dashboard', {}, token); }
+export function getCampaigns(token: string) { return api<{ campaigns: Campaign[] }>('/campaigns', {}, token); }
 export function getTasks(token: string, filters: { status?: TaskStatus | 'all'; startDate?: string; endDate?: string } = {}) {
   const params = new URLSearchParams();
   if (filters.status && filters.status !== 'all') params.set('status', filters.status);

@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Screen, Button, Field, Row, ErrorMessage, Card, Badge, IconCircle, Skeleton } from '../components/UI';
 import { colors, useTheme } from '../theme/theme';
 import { disableDailyReminder, enableDailyReminder, loadReminderState, NotificationStatus, ReminderState, updateDailyReminderTime } from '../services/reminders';
-import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
+import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getCampaigns, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
 
 const channels: { label: string; value: MarketingChannel }[] = [
   { label: 'Instagram', value: 'instagram' },
@@ -331,6 +331,98 @@ export function CalendarScreen() {
   function countFor(key: string) { return tasks.filter((task) => toDateInput(task.dueDate) === key).length + items.filter((item) => toDateInput(item.publishDate ?? item.scheduledFor) === key).length; }
   async function createFromDate(kind: 'content' | 'task') { if (!token) return; const title = kind === 'content' ? contentTitle.trim() : taskTitle.trim(); if (!title) return setError(kind === 'content' ? 'Add a content title.' : 'Add a task title.'); setSaving(true); setError(''); try { if (kind === 'content') { await createContentItem({ title, description: '', type: 'post', channel: 'instagram', status: 'planned', publishDate: localNoonTimestamp(selectedDate) }, token); setContentTitle(''); } else { await createTask({ title, description: '', dueDate: localNoonTimestamp(selectedDate), status: 'todo', priority: 'medium' }, token); setTaskTitle(''); } await load(); } catch (err) { setError(cleanApiError(err)); } finally { setSaving(false); } }
   return <Screen title="Calendar" subtitle="See planned content and marketing tasks by date."><ErrorMessage message={error} /><ChoiceRow options={['week', 'month'] as const} selected={view} onSelect={setView} /><Text style={{ color: colors.text, fontWeight: '800' }}>{displayLongDate(selectedDate)}</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{dates.map((key) => { const selected = key === selectedDate; const isToday = key === dateKey(today); const count = countFor(key); const date = new Date(`${key}T12:00:00`); return <Pressable key={key} onPress={() => setSelectedDate(key)} style={{ width: view === 'week' ? '13%' : '12.4%', minWidth: 42, borderRadius: 14, borderWidth: 1.5, borderColor: selected ? colors.primary : isToday ? colors.accent : colors.border, backgroundColor: selected ? colors.primary : isToday ? colors.accentSoft : colors.card, paddingVertical: 10, alignItems: 'center' }}><Text style={{ color: selected ? '#fff' : colors.muted, fontSize: 12 }}>{dayNames[(date.getDay() + 6) % 7]}</Text><Text style={{ color: selected ? '#fff' : colors.text, fontWeight: '800' }}>{date.getDate()}</Text><View style={{ flexDirection: 'row', gap: 3, marginTop: 5 }}>{Array.from({ length: Math.min(count, 3) }).map((_, index) => <View key={index} style={{ width: 5, height: 5, borderRadius: 999, backgroundColor: selected ? '#fff' : colors.primary }} />)}</View></Pressable>; })}</View><Section title="Selected day">{loading ? <ActivityIndicator color={colors.primary} /> : selectedTasks.length || selectedItems.length ? <>{selectedItems.map((item) => <Row key={item.id} title={item.title} detail={`Content · ${labelText(item.type)} · ${labelChannel(item.channel)} · ${labelText(item.status)}`} />)}{selectedTasks.map((task) => <Row key={task.id} title={task.title} detail={`Task · ${labelText(task.priority)} priority · ${labelText(task.status)}`} />)}</> : <EmptyState title="No items for this date" detail="Create a task or planned content item below." />}</Section><Section title="Create from selected date"><Field placeholder="Content title" value={contentTitle} onChangeText={setContentTitle} /><Button label="Create planned content" loading={saving} onPress={() => createFromDate('content')} /><Field placeholder="Task title" value={taskTitle} onChangeText={setTaskTitle} /><Button secondary label="Create task" loading={saving} onPress={() => createFromDate('task')} /></Section></Screen>;
+}
+
+
+
+type AnalyticsMetrics = {
+  marketingScore: number;
+  completedTasks: number;
+  pendingTasks: number;
+  publishedContent: number;
+  scheduledContent: number;
+  activeCampaigns: number;
+  weeklyCompletion: number;
+  currentStreak: number;
+  longestStreak: number;
+  missedDays: number;
+  weekSeries: { label: string; tasks: number; content: number }[];
+  monthCompleted: number;
+  monthContent: number;
+  monthCompletion: number;
+  badges: { label: string; detail: string; earned: boolean; icon: IconName }[];
+};
+
+function AnalyticsStat({ label, value, icon, tone = 'primary' }: { label: string; value: string | number; icon: IconName; tone?: 'primary' | 'success' | 'warning' | 'info' | 'purple' }) {
+  const palette = tone === 'success' ? [colors.success, colors.successSoft] : tone === 'warning' ? [colors.accent, colors.accentSoft] : tone === 'info' ? [colors.info, colors.infoSoft] : tone === 'purple' ? [colors.purple, colors.purpleSoft] : [colors.primary, colors.primarySoft];
+  return <Card><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><IconCircle name={icon} color={palette[0]} background={palette[1]} /><View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '900', fontSize: 22 }}>{value}</Text><Text style={{ color: colors.muted, fontWeight: '700', marginTop: 2 }}>{label}</Text></View></View></Card>;
+}
+
+function ProgressBar({ value, color = colors.primary }: { value: number; color?: string }) {
+  return <View style={{ height: 10, borderRadius: 999, backgroundColor: colors.surface, overflow: 'hidden' }}><View style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', borderRadius: 999, backgroundColor: color }} /></View>;
+}
+
+function MiniChart({ data, field, color }: { data: { label: string; tasks: number; content: number }[]; field: 'tasks' | 'content'; color: string }) {
+  const max = Math.max(1, ...data.map((item) => item[field]));
+  return <Card><View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 132 }}>{data.map((item) => { const height = Math.max(10, (item[field] / max) * 96); return <View key={item.label} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}><Text style={{ color: colors.text, fontWeight: '900', fontSize: 12 }}>{item[field]}</Text><View style={{ width: '100%', maxWidth: 34, height, borderRadius: 10, backgroundColor: color }} /><Text style={{ color: colors.muted, fontSize: 11, fontWeight: '700' }}>{item.label}</Text></View>; })}</View></Card>;
+}
+
+function buildAnalyticsMetrics(tasks: Task[], contentItems: ContentItem[], campaigns: Awaited<ReturnType<typeof getCampaigns>>['campaigns']): AnalyticsMetrics {
+  const today = new Date();
+  const weekStart = startOfWeekDate(today);
+  const weekEnd = addDaysToDate(weekStart, 6);
+  const monthStart = startOfMonthDate(today);
+  const monthEnd = endOfMonthDate(today);
+  const inRange = (key: string, start: Date, end: Date) => key >= dateKey(start) && key <= dateKey(end);
+  const taskKey = (task: Task) => toDateInput(task.dueDate);
+  const contentKey = (item: ContentItem) => toDateInput(item.publishDate ?? item.scheduledFor);
+  const weekTasks = tasks.filter((task) => taskKey(task) && inRange(taskKey(task), weekStart, weekEnd));
+  const weekContent = contentItems.filter((item) => contentKey(item) && inRange(contentKey(item), weekStart, weekEnd));
+  const monthTasks = tasks.filter((task) => taskKey(task) && inRange(taskKey(task), monthStart, monthEnd));
+  const monthContent = contentItems.filter((item) => contentKey(item) && inRange(contentKey(item), monthStart, monthEnd));
+  const completedTasks = weekTasks.filter((task) => task.status === 'done').length;
+  const pendingTasks = weekTasks.filter((task) => task.status !== 'done').length;
+  const publishedContent = weekContent.filter((item) => item.status === 'published').length;
+  const scheduledContent = weekContent.filter((item) => item.status === 'planned').length;
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active').length;
+  const weeklyCompletion = weekTasks.length ? Math.round((completedTasks / weekTasks.length) * 100) : 0;
+  const activeDays = new Set<string>();
+  tasks.filter((task) => task.status === 'done' && taskKey(task)).forEach((task) => activeDays.add(taskKey(task)));
+  contentItems.filter((item) => item.status === 'published' && contentKey(item)).forEach((item) => activeDays.add(contentKey(item)));
+  let currentStreak = 0;
+  for (let index = 0; index < 365; index += 1) { const key = dateKey(addDaysToDate(today, -index)); if (!activeDays.has(key)) break; currentStreak += 1; }
+  let longestStreak = 0; let rolling = 0;
+  Array.from(activeDays).sort().forEach((key, index, arr) => { rolling = index > 0 && dateKey(addDaysToDate(new Date(`${arr[index - 1]}T12:00:00`), 1)) === key ? rolling + 1 : 1; longestStreak = Math.max(longestStreak, rolling); });
+  const missedDays = Array.from({ length: 30 }, (_, index) => dateKey(addDaysToDate(today, -index))).filter((key) => !activeDays.has(key)).length;
+  const weekSeries = Array.from({ length: 7 }, (_, index) => { const date = addDaysToDate(weekStart, index); const key = dateKey(date); return { label: dayNames[index], tasks: weekTasks.filter((task) => task.status === 'done' && taskKey(task) === key).length, content: weekContent.filter((item) => item.status === 'published' && contentKey(item) === key).length }; });
+  const monthCompleted = monthTasks.filter((task) => task.status === 'done').length;
+  const monthPublishedContent = monthContent.filter((item) => item.status === 'published').length;
+  const monthCompletion = monthTasks.length ? Math.round((monthCompleted / monthTasks.length) * 100) : 0;
+  const consistencyDays = weekSeries.filter((item) => item.tasks + item.content > 0).length;
+  const marketingScore = Math.min(100, Math.round((weeklyCompletion * 0.35) + (Math.min(scheduledContent, 5) / 5 * 20) + (Math.min(activeCampaigns, 2) / 2 * 20) + (consistencyDays / 7 * 25)));
+  const totalCompleted = tasks.filter((task) => task.status === 'done').length;
+  return { marketingScore, completedTasks, pendingTasks, publishedContent, scheduledContent, activeCampaigns, weeklyCompletion, currentStreak, longestStreak, missedDays, weekSeries, monthCompleted, monthContent: monthPublishedContent, monthCompletion, badges: [
+    { label: 'First Campaign', detail: 'Create or run your first campaign.', earned: campaigns.length > 0, icon: 'megaphone' },
+    { label: '7 Day Streak', detail: 'Log marketing activity for 7 days straight.', earned: longestStreak >= 7, icon: 'flame' },
+    { label: '30 Completed Tasks', detail: 'Complete 30 marketing tasks.', earned: totalCompleted >= 30, icon: 'checkmark-done' },
+    { label: 'Content Master', detail: 'Publish 10 content items.', earned: contentItems.filter((item) => item.status === 'published').length >= 10, icon: 'trophy' }
+  ] };
+}
+
+export function AnalyticsScreen() {
+  const { token } = useAuth();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [contentItems, setContentItems] = useState<ContentItem[]>([]);
+  const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getCampaigns>>['campaigns']>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const range = useMemo(() => ({ start: dateKey(addDaysToDate(startOfMonthDate(new Date()), -35)), end: dateKey(endOfMonthDate(new Date())) }), []);
+  const load = useCallback(async () => { if (!token) return; setLoading(true); setError(''); try { const [taskData, contentData, campaignData] = await Promise.all([getTasks(token, { startDate: range.start, endDate: range.end }), getContentItems(token, { startDate: range.start, endDate: range.end }), getCampaigns(token)]); setTasks(taskData.tasks); setContentItems(contentData.contentItems); setCampaigns(campaignData.campaigns); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); } }, [range.end, range.start, token]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  const metrics = useMemo(() => buildAnalyticsMetrics(tasks, contentItems, campaigns), [campaigns, contentItems, tasks]);
+  const empty = !tasks.length && !contentItems.length && !campaigns.length;
+  if (loading) return <Screen title="Analytics" subtitle="Calculating your marketing consistency."><Skeleton /><Skeleton /><Skeleton /></Screen>;
+  return <Screen title="Analytics" subtitle="Measure consistency, activity, streaks, and business momentum." refreshing={loading} onRefresh={load}><ErrorMessage message={error} />{error ? <Button secondary label="Try again" icon="refresh" onPress={load} /> : null}{empty ? <EmptyState icon="bar-chart" title="No analytics yet" detail="Create tasks, schedule content, or start a campaign to unlock your marketing score and streaks." /> : null}<Card elevated><View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}><IconCircle name="speedometer" size={24} /><View style={{ flex: 1 }}><Text style={{ color: colors.muted, fontWeight: '800' }}>Marketing Score</Text><Text style={{ color: colors.text, fontWeight: '900', fontSize: 42, letterSpacing: -1 }}>{metrics.marketingScore}<Text style={{ fontSize: 20 }}>/100</Text></Text><ProgressBar value={metrics.marketingScore} /></View></View></Card><Section title="Dashboard widgets"><View style={{ gap: 8 }}><AnalyticsStat label="Current streak" value={`${metrics.currentStreak} days`} icon="flame" tone="warning" /><AnalyticsStat label="Weekly completion" value={`${metrics.weeklyCompletion}%`} icon="pie-chart" tone="success" /><AnalyticsStat label="Marketing score" value={metrics.marketingScore} icon="analytics" tone="info" /></View></Section><Section title="Weekly statistics"><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><View style={{ flexBasis: '48%', flexGrow: 1 }}><AnalyticsStat label="Tasks completed" value={metrics.completedTasks} icon="checkmark-done" tone="success" /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><AnalyticsStat label="Tasks pending" value={metrics.pendingTasks} icon="time" tone="warning" /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><AnalyticsStat label="Content published" value={metrics.publishedContent} icon="paper-plane" tone="info" /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><AnalyticsStat label="Campaigns running" value={metrics.activeCampaigns} icon="megaphone" tone="purple" /></View></View></Section><Section title="Streak system"><View style={{ flexDirection: 'row', gap: 8 }}><View style={{ flex: 1 }}><AnalyticsStat label="Current" value={metrics.currentStreak} icon="flame" tone="warning" /></View><View style={{ flex: 1 }}><AnalyticsStat label="Longest" value={metrics.longestStreak} icon="ribbon" tone="success" /></View><View style={{ flex: 1 }}><AnalyticsStat label="Missed" value={metrics.missedDays} icon="moon" tone="info" /></View></View></Section><Section title="Progress cards"><Card><Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>This week performance</Text><Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>{metrics.completedTasks} completed tasks, {metrics.scheduledContent} scheduled content items, and {metrics.activeCampaigns} active campaigns.</Text><ProgressBar value={metrics.weeklyCompletion} color={colors.success} /></Card><Card><Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>Monthly performance</Text><Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>{metrics.monthCompleted} completed tasks and {metrics.monthContent} published content items this month.</Text><ProgressBar value={metrics.monthCompletion} color={colors.info} /></Card></Section><Section title="Tasks completed over time"><MiniChart data={metrics.weekSeries} field="tasks" color={colors.primary} /></Section><Section title="Content activity over time"><MiniChart data={metrics.weekSeries} field="content" color={colors.accent} /></Section><Section title="Achievement badges">{metrics.badges.map((badge) => <Card key={badge.label}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, opacity: badge.earned ? 1 : 0.55 }}><IconCircle name={badge.icon} background={badge.earned ? colors.successSoft : colors.surface} color={badge.earned ? colors.success : colors.muted} /><View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '900' }}>{badge.label}</Text><Text style={{ color: colors.muted, marginTop: 4, lineHeight: 19 }}>{badge.detail}</Text></View><Badge label={badge.earned ? 'Earned' : 'Locked'} tone={badge.earned ? 'success' : 'neutral'} /></View></Card>)}</Section></Screen>;
 }
 
 export function WeeklyPlanScreen() {
