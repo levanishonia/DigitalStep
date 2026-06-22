@@ -7,7 +7,7 @@ import { Screen, Button, Field, Row, ErrorMessage, Card, Badge, IconCircle, Skel
 import { colors, useTheme } from '../theme/theme';
 import { disableDailyReminder, enableDailyReminder, loadReminderState, NotificationStatus, ReminderState, updateDailyReminderTime } from '../services/reminders';
 import { BusinessInput, Language, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getCampaigns, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateBusinessContentLanguage, updateContentItem, updateTask } from '../services/api';
-import { useI18n } from '../i18n/i18n';
+import { getActiveLanguage, translate, useI18n } from '../i18n/i18n';
 
 const channels: { label: string; value: MarketingChannel }[] = [
   { label: 'Instagram', value: 'instagram' },
@@ -28,13 +28,13 @@ function LanguageChoice({ selected, onSelect }: { selected: Language; onSelect: 
 }
 
 function cleanApiError(error: unknown) {
-  const message = error instanceof Error ? error.message : 'Something went wrong. Please try again.';
-  if (message.includes('Expected') || message.includes('String must')) return 'Please check your details and try again.';
+  const message = error instanceof Error ? error.message : translate('common.somethingWrong');
+  if (message.includes('Expected') || message.includes('String must')) return translate('error.checkDetails');
   return message;
 }
 
 function labelChannel(channel: string) {
-  return channels.find((item) => item.value === channel)?.label ?? channel;
+  return translate(`channel.${channel}`);
 }
 
 function dateKeyFromValue(value?: string | null) {
@@ -45,16 +45,26 @@ function dateKeyFromValue(value?: string | null) {
 
 function formatDate(value?: string | null) {
   const key = dateKeyFromValue(value);
-  if (!key) return 'No date set';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(`${key}T12:00:00`));
+  if (!key) return translate('common.noDate');
+  return new Intl.DateTimeFormat(getActiveLanguage() === 'ka' ? 'ka-GE' : undefined, { month: 'short', day: 'numeric' }).format(new Date(`${key}T12:00:00`));
 }
 
 function toDateInput(value?: string | null) {
   return dateKeyFromValue(value);
 }
 
-function labelText(value: string) {
+function humanizeLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function labelText(value: string) {
+  const labelKey = `label.${value}`;
+  const translatedLabel = translate(labelKey);
+  if (translatedLabel !== labelKey) return translatedLabel;
+  const channelKey = `channel.${value}`;
+  const translatedChannel = translate(channelKey);
+  if (translatedChannel !== channelKey) return translatedChannel;
+  return humanizeLabel(value);
 }
 
 function localNoonTimestamp(value?: string) {
@@ -83,13 +93,13 @@ function SummaryCard({ label, value, icon, tone }: { label: string; value: numbe
   return <Card><IconCircle name={icon} color={palette[0]} background={palette[1]} /><Text style={{ color: colors.text, fontWeight: '900', fontSize: 26, marginTop: 10 }}>{value}</Text><Text style={{ color: colors.muted, fontWeight: '700', marginTop: 2 }}>{label}</Text></Card>;
 }
 
-function DatePickerField({ value, onChange, placeholder = 'Select date' }: { value?: string; onChange: (value: string) => void; placeholder?: string }) {
+function DatePickerField({ value, onChange, placeholder = translate('common.selectDate') }: { value?: string; onChange: (value: string) => void; placeholder?: string }) {
   const [open, setOpen] = useState(false);
   const base = value ? new Date(`${value}T12:00:00`) : new Date();
   const start = startOfWeekDate(base);
   const dates = Array.from({ length: 21 }, (_, index) => dateKey(addDaysToDate(start, index - 7)));
   if (Platform.OS === 'web') return <Field placeholder={placeholder} value={value} onChangeText={onChange} inputMode="numeric" />;
-  return <><Pressable onPress={() => setOpen(true)} style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: value ? colors.text : colors.muted, fontSize: 16 }}>{value ? displayLongDate(value) : placeholder}</Text><Ionicons name="calendar" size={20} color={colors.primary} /></Pressable><Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}><Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(15,32,29,0.32)', justifyContent: 'flex-end' }}><Pressable style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, gap: 12 }}><Text style={{ color: colors.text, fontSize: 20, fontWeight: '900' }}>Choose a date</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{dates.map((key) => { const selected = key === value; const date = new Date(`${key}T12:00:00`); return <Pressable key={key} onPress={() => { onChange(key); setOpen(false); }} style={{ width: '30.5%', borderRadius: 16, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.surface, padding: 12, alignItems: 'center' }}><Text style={{ color: selected ? '#fff' : colors.muted, fontWeight: '700', fontSize: 12 }}>{dayNames[(date.getDay() + 6) % 7]}</Text><Text style={{ color: selected ? '#fff' : colors.text, fontWeight: '900', marginTop: 2 }}>{formatDate(key)}</Text></Pressable>; })}</View><Button secondary label="Clear date" icon="close-circle" onPress={() => { onChange(''); setOpen(false); }} /></Pressable></Pressable></Modal></>;
+  return <><Pressable onPress={() => setOpen(true)} style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: value ? colors.text : colors.muted, fontSize: 16 }}>{value ? displayLongDate(value) : placeholder}</Text><Ionicons name="calendar" size={20} color={colors.primary} /></Pressable><Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}><Pressable onPress={() => setOpen(false)} style={{ flex: 1, backgroundColor: 'rgba(15,32,29,0.32)', justifyContent: 'flex-end' }}><Pressable style={{ backgroundColor: colors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, gap: 12 }}><Text style={{ color: colors.text, fontSize: 20, fontWeight: '900' }}>{translate('common.chooseDate')}</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{dates.map((key) => { const selected = key === value; const date = new Date(`${key}T12:00:00`); return <Pressable key={key} onPress={() => { onChange(key); setOpen(false); }} style={{ width: '30.5%', borderRadius: 16, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.surface, padding: 12, alignItems: 'center' }}><Text style={{ color: selected ? '#fff' : colors.muted, fontWeight: '700', fontSize: 12 }}>{dayNames[(date.getDay() + 6) % 7]}</Text><Text style={{ color: selected ? '#fff' : colors.text, fontWeight: '900', marginTop: 2 }}>{formatDate(key)}</Text></Pressable>; })}</View><Button secondary label={translate('common.clearDate')} icon="close-circle" onPress={() => { onChange(''); setOpen(false); }} /></Pressable></Pressable></Modal></>;
 }
 
 function useDashboard() {
@@ -196,7 +206,7 @@ export function HomeScreen({ navigation }: any) {
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   if (loading) return <Screen title="Dashboard" subtitle="Loading your marketing workspace."><Skeleton /><Skeleton /><Skeleton /></Screen>;
   const business = dashboard?.business;
-  return <Screen title={`${greeting}, ${user?.name?.split(' ')[0] ?? business?.name ?? 'there'} 👋`} subtitle={business ? `${business.name} marketing command center.` : 'Your marketing at a glance.'} refreshing={loading} onRefresh={reload}><ErrorMessage message={error} />{error ? <Button secondary label="Try again" icon="refresh" onPress={reload} /> : null}<View style={{ flexDirection: 'row', gap: 8 }}><View style={{ flex: 1 }}><SummaryCard label="Due today" value={dashboard?.tasks.length ?? 0} icon="today" tone="primary" /></View><View style={{ flex: 1 }}><SummaryCard label="Upcoming" value={dashboard?.contentItems.length ?? 0} icon="paper-plane" tone="info" /></View><View style={{ flex: 1 }}><SummaryCard label="Campaigns" value={dashboard?.campaigns.length ?? 0} icon="megaphone" tone="accent" /></View></View><Section title="Quick actions"><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button label="Create Task" icon="add-circle" onPress={() => navigation.navigate('Tasks')} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Create Content" icon="create" onPress={() => navigation.navigate('Planner')} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Browse Templates" icon="library" onPress={() => navigation.navigate('Templates')} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Create Campaign" icon="megaphone" onPress={() => navigation.navigate('Campaigns')} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Open Calendar" icon="calendar" onPress={() => navigation.navigate('Calendar')} /></View></View></Section><Section title="Today’s marketing tasks">{dashboard?.tasks.length ? dashboard.tasks.map((task) => <Row key={task.id} icon="checkmark-circle" title={task.title} detail={`${labelText(task.status)} · ${formatDate(task.dueDate)}${task.description ? ` · ${task.description}` : ''}`} right={<Badge label={labelText(task.priority)} tone={priorityTone[task.priority]} />} />) : <EmptyState icon="checkmark-done" title="No tasks due today" detail="Enjoy the breathing room or create a quick action for tomorrow." />}</Section><Section title="Upcoming content">{dashboard?.contentItems.length ? dashboard.contentItems.map((item) => <Row key={item.id} icon={channelIcon[item.channel]} title={item.title} detail={`${labelText(item.type)} · ${labelChannel(item.channel)} · ${formatDate(item.publishDate ?? item.scheduledFor)}`} right={<Badge label={labelText(item.status)} tone={statusTone[item.status]} />} />) : <EmptyState icon="images" title="No upcoming content" detail="Planned posts, emails, and website updates will show up here." />}</Section><Section title="Active campaigns">{dashboard?.campaigns.length ? dashboard.campaigns.map((campaign) => <Row key={campaign.id} icon="megaphone" title={campaign.name} detail={campaign.objective} right={<Badge label={labelText(campaign.status)} tone={statusTone[campaign.status]} />} />) : <EmptyState icon="flag" title="No active campaigns" detail="Create campaigns when you are ready to track focused marketing pushes." />}</Section><Section title="Recommendations">{dashboard?.recommendations.length ? dashboard.recommendations.map((recommendation) => <Row key={recommendation.id} icon="bulb" title={recommendation.title} detail={recommendation.description} right={<Badge label={`P${recommendation.priority}`} tone="warning" />} />) : <EmptyState icon="bulb" title="No recommendations yet" detail="DigitalStep will surface practical suggestions as your plan fills in." />}</Section></Screen>;
+  return <Screen title={`${greeting}, ${user?.name?.split(' ')[0] ?? business?.name ?? 'there'} 👋`} subtitle={business ? `${business.name} marketing command center.` : 'Your marketing at a glance.'} refreshing={loading} onRefresh={reload}><ErrorMessage message={error} />{error ? <Button secondary label="Try again" icon="refresh" onPress={reload} /> : null}<View style={{ flexDirection: 'row', gap: 8 }}><View style={{ flex: 1 }}><SummaryCard label="Due today" value={dashboard?.tasks.length ?? 0} icon="today" tone="primary" /></View><View style={{ flex: 1 }}><SummaryCard label="Upcoming" value={dashboard?.contentItems.length ?? 0} icon="paper-plane" tone="info" /></View><View style={{ flex: 1 }}><SummaryCard label="Campaigns" value={dashboard?.campaigns.length ?? 0} icon="megaphone" tone="accent" /></View></View><Section title="Quick actions"><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button label="Create Task" icon="add-circle" onPress={() => navigation.navigate('TasksTab', { screen: 'TasksMain' })} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Create Content" icon="create" onPress={() => navigation.navigate('PlannerTab', { screen: 'ContentPlanner' })} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Browse Templates" icon="library" onPress={() => navigation.navigate('MoreTab', { screen: 'Templates' })} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Create Campaign" icon="megaphone" onPress={() => navigation.navigate('AnalyticsTab', { screen: 'Campaigns' })} /></View><View style={{ flexBasis: '48%', flexGrow: 1 }}><Button secondary label="Open Calendar" icon="calendar" onPress={() => navigation.navigate('PlannerTab', { screen: 'Calendar' })} /></View></View></Section><Section title="Today’s marketing tasks">{dashboard?.tasks.length ? dashboard.tasks.map((task) => <Row key={task.id} icon="checkmark-circle" title={task.title} detail={`${labelText(task.status)} · ${formatDate(task.dueDate)}${task.description ? ` · ${task.description}` : ''}`} right={<Badge label={labelText(task.priority)} tone={priorityTone[task.priority]} />} />) : <EmptyState icon="checkmark-done" title="No tasks due today" detail="Enjoy the breathing room or create a quick action for tomorrow." />}</Section><Section title="Upcoming content">{dashboard?.contentItems.length ? dashboard.contentItems.map((item) => <Row key={item.id} icon={channelIcon[item.channel]} title={item.title} detail={`${labelText(item.type)} · ${labelChannel(item.channel)} · ${formatDate(item.publishDate ?? item.scheduledFor)}`} right={<Badge label={labelText(item.status)} tone={statusTone[item.status]} />} />) : <EmptyState icon="images" title="No upcoming content" detail="Planned posts, emails, and website updates will show up here." />}</Section><Section title="Active campaigns">{dashboard?.campaigns.length ? dashboard.campaigns.map((campaign) => <Row key={campaign.id} icon="megaphone" title={campaign.name} detail={campaign.objective} right={<Badge label={labelText(campaign.status)} tone={statusTone[campaign.status]} />} />) : <EmptyState icon="flag" title="No active campaigns" detail="Create campaigns when you are ready to track focused marketing pushes." />}</Section><Section title="Recommendations">{dashboard?.recommendations.length ? dashboard.recommendations.map((recommendation) => <Row key={recommendation.id} icon="bulb" title={recommendation.title} detail={recommendation.description} right={<Badge label={`P${recommendation.priority}`} tone="warning" />} />) : <EmptyState icon="bulb" title="No recommendations yet" detail="DigitalStep will surface practical suggestions as your plan fills in." />}</Section></Screen>;
 }
 
 function Chip<T extends string>({ label, value, selected, onPress }: { label: string; value: T; selected: boolean; onPress: (value: T) => void }) {
@@ -298,7 +308,7 @@ export function TemplatesScreen({ navigation }: any) {
       await createContentItem({ title: template.title, description: `${template.description}\n\nExample caption: ${template.exampleCaption}`, type: template.type, channel: template.channel, status: 'draft', publishDate: '' }, token);
       if (includeTask) await createTask({ title: template.recommendedTask, description: `Recommended next step for template: ${template.title}`, dueDate: '', status: 'todo', priority: 'medium' }, token);
       setNotice(includeTask ? 'Template added as draft content with a recommended task.' : 'Template added as draft content.');
-      navigation.navigate('Planner');
+      navigation.navigate('PlannerTab', { screen: 'ContentPlanner' });
     } catch (err) { setError(cleanApiError(err)); } finally { setSavingId(''); }
   }
   return <Screen title="Templates" subtitle="Ready-to-use, rule-based marketing ideas matched to your business type." refreshing={loading} onRefresh={reload}><ErrorMessage message={error} />{notice ? <Card><Text style={{ color: colors.success, fontWeight: '800' }}>{notice}</Text></Card> : null}<Section title="Filters"><Text style={{ color: colors.text, fontWeight: '700' }}>Industry</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{industryFilters.map((item) => <Chip key={item.value} label={item.value === 'business' && business ? `${item.label}: ${labelText(businessIndustry)}` : item.label} value={item.value} selected={industry === item.value} onPress={setIndustry} />)}</View><Text style={{ color: colors.text, fontWeight: '700' }}>Channel</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><Chip label="All" value="all" selected={channel === 'all'} onPress={setChannel} />{channels.map((item) => <Chip key={item.value} label={item.label} value={item.value} selected={channel === item.value} onPress={setChannel} />)}</View><Text style={{ color: colors.text, fontWeight: '700' }}>Category</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><Chip label="All" value="all" selected={category === 'all'} onPress={setCategory} />{templateCategories.map((item) => <Chip key={item.value} label={item.label} value={item.value} selected={category === item.value} onPress={setCategory} />)}</View><View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}><Text style={{ color: colors.text, fontWeight: '800', flex: 1 }}>Also create recommended task</Text><Switch value={includeTask} onValueChange={setIncludeTask} trackColor={{ false: colors.border, true: colors.primarySoft }} thumbColor={includeTask ? colors.primary : colors.muted} /></View></Section><Section title={`${templates.length} templates`} action={<Badge label="Local rules" tone="info" />}>{templates.length ? templates.map((template) => { const meta = templateCategories.find((item) => item.value === template.category); return <Card key={template.id} elevated><View style={{ flexDirection: 'row', gap: 12 }}><IconCircle name={meta?.icon ?? 'library'} background={colors.primarySoft} color={colors.primary} /><View style={{ flex: 1 }}><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}><Badge label={meta?.label ?? labelText(template.category)} tone="purple" /><Badge label={labelChannel(template.channel)} tone="info" /><Badge label={labelText(template.type)} tone="neutral" /></View><Text style={{ color: colors.text, fontWeight: '900', fontSize: 18, marginTop: 10 }}>{template.title}</Text><Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>{template.description}</Text><Card><Text style={{ color: colors.text, fontWeight: '800' }}>Example caption</Text><Text style={{ color: colors.muted, marginTop: 6, lineHeight: 20 }}>{template.exampleCaption}</Text></Card><Text style={{ color: colors.text, fontWeight: '800', marginTop: 10 }}>Recommended task</Text><Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>{template.recommendedTask}</Text><Button label="Use template" icon="add-circle" loading={savingId === template.id} onPress={() => useTemplate(template)} /></View></View></Card>; }) : <EmptyState icon="search" title="No templates match" detail="Try another industry, channel, or category filter." />}</Section></Screen>;
@@ -313,7 +323,7 @@ function dateKey(date: Date) {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
-function displayLongDate(key: string) { return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${key}T12:00:00`)); }
+function displayLongDate(key: string) { return new Intl.DateTimeFormat(getActiveLanguage() === 'ka' ? 'ka-GE' : undefined, { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${key}T12:00:00`)); }
 function startOfWeekDate(date: Date) { const next = new Date(date); const day = next.getDay(); next.setDate(next.getDate() + (day === 0 ? -6 : 1 - day)); next.setHours(12, 0, 0, 0); return next; }
 function addDaysToDate(date: Date, days: number) { const next = new Date(date); next.setDate(next.getDate() + days); return next; }
 function startOfMonthDate(date: Date) { return new Date(date.getFullYear(), date.getMonth(), 1, 12); }
@@ -433,7 +443,12 @@ export function AnalyticsScreen() {
   const [campaigns, setCampaigns] = useState<Awaited<ReturnType<typeof getCampaigns>>['campaigns']>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const range = useMemo(() => ({ start: dateKey(addDaysToDate(startOfMonthDate(new Date()), -35)), end: dateKey(endOfMonthDate(new Date())) }), []);
+  const range = useMemo(() => {
+    const today = new Date();
+    const weekEnd = addDaysToDate(startOfWeekDate(today), 6);
+    const monthEnd = endOfMonthDate(today);
+    return { start: dateKey(addDaysToDate(startOfMonthDate(today), -35)), end: dateKey(weekEnd > monthEnd ? weekEnd : monthEnd) };
+  }, []);
   const load = useCallback(async () => { if (!token) return; setLoading(true); setError(''); try { const [taskData, contentData, campaignData] = await Promise.all([getTasks(token, { startDate: range.start, endDate: range.end }), getContentItems(token, { startDate: range.start, endDate: range.end }), getCampaigns(token)]); setTasks(taskData.tasks); setContentItems(contentData.contentItems); setCampaigns(campaignData.campaigns); } catch (err) { setError(cleanApiError(err)); } finally { setLoading(false); } }, [range.end, range.start, token]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const metrics = useMemo(() => buildAnalyticsMetrics(tasks, contentItems, campaigns), [campaigns, contentItems, tasks]);
@@ -508,6 +523,18 @@ export function RecommendationsScreen() {
   ];
   return <Screen title="Recommendations" subtitle="Practical suggestions based on your plan and schedule."><Section title="Actionable next steps">{recommendations.map((item) => <Row key={item.title} icon={item.icon} title={item.title} detail={item.detail} right={<Ionicons name="chevron-forward" size={18} color={colors.muted} />} />)}</Section></Screen>;
 }
+export function MoreScreen({ navigation }: any) {
+  const { t } = useI18n();
+  const items = [
+    { route: 'Templates', icon: 'library' as IconName, title: t('nav.templates'), detail: t('more.templatesDetail') },
+    { route: 'Tips', icon: 'bulb' as IconName, title: t('nav.tips'), detail: t('more.tipsDetail') },
+    { route: 'Settings', icon: 'settings' as IconName, title: t('nav.settings'), detail: t('more.settingsDetail') },
+    { route: 'Settings', icon: 'person-circle' as IconName, title: t('more.profile'), detail: t('more.profileDetail') },
+    { route: 'Settings', icon: 'language' as IconName, title: t('more.language'), detail: t('more.languageDetail') }
+  ];
+  return <Screen title={t('nav.more')} subtitle={t('more.subtitle')}><Section title={t('more.sections')}>{items.map((item) => <Pressable key={`${item.route}-${item.title}`} onPress={() => navigation.navigate(item.route)}><Row icon={item.icon} title={item.title} detail={item.detail} right={<Ionicons name="chevron-forward" size={18} color={colors.muted} />} /></Pressable>)}</Section></Screen>;
+}
+
 export function SettingsScreen() {
   const { logout, token, user, updatePreferredLanguage } = useAuth();
   const { t, language } = useI18n();
@@ -566,13 +593,13 @@ function DailyReminderCard({ reminder, reminderTimes, saving, error, onToggle, o
 }
 
 function notificationStatusLabel(status: NotificationStatus) {
-  if (status === 'granted') return 'Notifications allowed';
-  if (status === 'denied') return 'Notifications blocked';
-  if (status === 'unavailable') return 'Unavailable on web';
-  return 'Permission not requested';
+  if (status === 'granted') return translate('reminders.allowed');
+  if (status === 'denied') return translate('reminders.blocked');
+  if (status === 'unavailable') return translate('reminders.unavailable');
+  return translate('reminders.notRequested');
 }
 
 function formatReminderTime(time: string) {
   const [hour, minute] = time.split(':').map(Number);
-  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(2026, 0, 1, hour, minute));
+  return new Intl.DateTimeFormat(getActiveLanguage() === 'ka' ? 'ka-GE' : undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(2026, 0, 1, hour, minute));
 }
