@@ -154,5 +154,8 @@
   "reminders.allowed": "შეტყობინებები დაშვებულია",
   "reminders.blocked": "შეტყობინებები დაბლოკილია",
   "reminders.unavailable": "ვებში მიუწვდომელია",
-  "reminders.notRequested": "ნებართვა მოთხოვნილი არ არის"
+  "reminders.notRequested": "ნებართვა მოთხოვნილი არ არის",
+  "nav.dsStudio": "DS Studio",
+  "more.weeklyPlannerDetail": "დააგენერირეთ და მიიღეთ კვირის მარკეტინგული გეგმა.",
+  "more.contentPlannerDetail": "შექმენით, შეცვალეთ და დაგეგმეთ კონტენტი."
 }

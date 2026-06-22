@@ -154,5 +154,8 @@
   "reminders.allowed": "Notifications allowed",
   "reminders.blocked": "Notifications blocked",
   "reminders.unavailable": "Unavailable on web",
-  "reminders.notRequested": "Permission not requested"
+  "reminders.notRequested": "Permission not requested",
+  "nav.dsStudio": "DS Studio",
+  "more.weeklyPlannerDetail": "Generate and accept a smart weekly marketing plan.",
+  "more.contentPlannerDetail": "Create, edit, and schedule content items."
 }
