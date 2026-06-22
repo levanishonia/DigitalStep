@@ -1,10 +1,11 @@
-import { ReactNode, useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../auth/AuthContext';
 import { Screen, Button, Field, Row, ErrorMessage, Card, Badge, IconCircle, Skeleton } from '../components/UI';
 import { colors, useTheme } from '../theme/theme';
+import { disableDailyReminder, enableDailyReminder, loadReminderState, NotificationStatus, ReminderState, updateDailyReminderTime } from '../services/reminders';
 import { BusinessInput, ContentItem, ContentItemInput, ContentStatus, ContentType, DashboardResponse, MarketingChannel, Task, TaskInput, TaskPriority, TaskStatus, WeeklyPlanResponse, acceptWeeklyPlan, createContentItem, createTask, deleteContentItem, deleteTask, getCalendar, getContentItems, getDashboard, getTasks, getWeeklyPlan, updateContentItem, updateTask } from '../services/api';
 
 const channels: { label: string; value: MarketingChannel }[] = [
@@ -347,5 +348,61 @@ export function SettingsScreen() {
   const { isDark, toggleTheme } = useTheme();
   const { dashboard, loading, reload } = useDashboard();
   const business = dashboard?.business;
-  return <Screen title="Settings" subtitle="Manage account, business profile, and workspace preferences." refreshing={loading} onRefresh={reload}>{business ? <Section title="Business"><Row icon="business" title="Business Profile" detail={`${business.name} · ${business.industry}`} /><Row icon="location" title="Market" detail={`${business.audience}${business.location ? ` · ${business.location}` : ''}`} /><Row icon="share-social" title="Channels" detail={business.channels.map(labelChannel).join(', ')} /></Section> : <EmptyState icon="business" title="No business profile" detail="Complete onboarding to add your business details." />}<Section title="Preferences"><Row icon="notifications" title="Notifications" detail="Reminders for tasks, scheduled content, and campaigns." right={<Badge label="On" tone="success" />} /><Pressable onPress={toggleTheme}><Row icon={isDark ? 'sunny' : 'moon'} title="Dark Mode" detail={isDark ? 'Low-light interface is enabled.' : 'Switch to a low-light interface.'} right={<Badge label={isDark ? 'On' : 'Off'} tone={isDark ? 'purple' : 'neutral'} />} /></Pressable><Row icon="card" title="Subscription" detail="Manage plan, billing, and premium features." /><Row icon="help-circle" title="Help & Support" detail="Get answers, contact support, and view guides." /></Section><Button secondary label="Logout" icon="log-out" onPress={logout} /></Screen>;
+  const [reminder, setReminder] = useState<ReminderState>({ enabled: false, time: '09:00', notificationStatus: 'undetermined' });
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderError, setReminderError] = useState('');
+  const reminderTimes = ['08:00', '09:00', '12:00', '17:00'];
+
+  useEffect(() => {
+    let mounted = true;
+    loadReminderState().then((state) => { if (mounted) setReminder(state); }).catch(() => { if (mounted) setReminderError('Unable to load reminder settings.'); });
+    return () => { mounted = false; };
+  }, []);
+
+  async function toggleReminder(enabled: boolean) {
+    setReminderSaving(true);
+    setReminderError('');
+    try {
+      const next = enabled ? await enableDailyReminder(reminder.time) : await disableDailyReminder(reminder.time);
+      setReminder(next);
+      if (enabled && next.notificationStatus !== 'granted') setReminderError('Notifications are not enabled. Allow notifications in your device settings to use daily reminders.');
+    } catch {
+      setReminderError('Unable to update daily reminders. Please try again.');
+    } finally {
+      setReminderSaving(false);
+    }
+  }
+
+  async function changeReminderTime(time: string) {
+    setReminder((current) => ({ ...current, time }));
+    setReminderSaving(true);
+    setReminderError('');
+    try {
+      setReminder(await updateDailyReminderTime(time));
+    } catch {
+      setReminderError('Unable to update reminder time. Please try again.');
+    } finally {
+      setReminderSaving(false);
+    }
+  }
+
+  return <Screen title="Settings" subtitle="Manage account, business profile, and workspace preferences." refreshing={loading} onRefresh={reload}>{business ? <Section title="Business"><Row icon="business" title="Business Profile" detail={`${business.name} · ${business.industry}`} /><Row icon="location" title="Market" detail={`${business.audience}${business.location ? ` · ${business.location}` : ''}`} /><Row icon="share-social" title="Channels" detail={business.channels.map(labelChannel).join(', ')} /></Section> : <EmptyState icon="business" title="No business profile" detail="Complete onboarding to add your business details." />}<Section title="Preferences"><DailyReminderCard reminder={reminder} reminderTimes={reminderTimes} saving={reminderSaving} error={reminderError} onToggle={toggleReminder} onChangeTime={changeReminderTime} /><Pressable onPress={toggleTheme}><Row icon={isDark ? 'sunny' : 'moon'} title="Dark Mode" detail={isDark ? 'Low-light interface is enabled.' : 'Switch to a low-light interface.'} right={<Badge label={isDark ? 'On' : 'Off'} tone={isDark ? 'purple' : 'neutral'} />} /></Pressable><Row icon="card" title="Subscription" detail="Manage plan, billing, and premium features." /><Row icon="help-circle" title="Help & Support" detail="Get answers, contact support, and view guides." /></Section><Button secondary label="Logout" icon="log-out" onPress={logout} /></Screen>;
+}
+
+function DailyReminderCard({ reminder, reminderTimes, saving, error, onToggle, onChangeTime }: { reminder: ReminderState; reminderTimes: string[]; saving: boolean; error: string; onToggle: (enabled: boolean) => void; onChangeTime: (time: string) => void }) {
+  const status = notificationStatusLabel(reminder.notificationStatus);
+  const statusTone = reminder.enabled && reminder.notificationStatus === 'granted' ? 'success' : reminder.notificationStatus === 'denied' ? 'danger' : 'neutral';
+  return <Card><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><IconCircle name="notifications" /><View style={{ flex: 1 }}><Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Enable daily reminders</Text><Text style={{ color: colors.muted, marginTop: 4, lineHeight: 20 }}>{reminder.enabled ? `Daily local reminder scheduled for ${formatReminderTime(reminder.time)}.` : 'Get a simple daily nudge to finish your marketing plan.'}</Text></View><Switch value={reminder.enabled} disabled={saving || reminder.notificationStatus === 'unavailable'} onValueChange={onToggle} trackColor={{ false: colors.border, true: colors.primarySoft }} thumbColor={reminder.enabled ? colors.primary : colors.muted} /></View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14, alignItems: 'center' }}><Badge label={status} tone={statusTone} /><Badge label={reminder.enabled ? 'Reminders on' : 'Reminders off'} tone={reminder.enabled ? 'success' : 'neutral'} /></View><Text style={{ color: colors.text, fontWeight: '800', marginTop: 16 }}>Reminder time</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{reminderTimes.map((time) => <Chip key={time} label={formatReminderTime(time)} value={time} selected={reminder.time === time} onPress={onChangeTime} />)}</View><Text style={{ color: colors.muted, marginTop: 12, lineHeight: 20 }}>Local notifications only. No push server notifications are used.</Text><ErrorMessage message={error} /></Card>;
+}
+
+function notificationStatusLabel(status: NotificationStatus) {
+  if (status === 'granted') return 'Notifications allowed';
+  if (status === 'denied') return 'Notifications blocked';
+  if (status === 'unavailable') return 'Unavailable on web';
+  return 'Permission not requested';
+}
+
+function formatReminderTime(time: string) {
+  const [hour, minute] = time.split(':').map(Number);
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(new Date(2026, 0, 1, hour, minute));
 }
