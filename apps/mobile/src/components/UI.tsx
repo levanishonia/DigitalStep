@@ -2,13 +2,15 @@ import { ReactNode } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, useTheme } from '../theme/theme';
+import { useI18n } from '../i18n/i18n';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 export function Screen({ children, title, subtitle, centered, refreshing, onRefresh }: { children: ReactNode; title: string; subtitle?: string; centered?: boolean; refreshing?: boolean; onRefresh?: () => void }) {
   useTheme();
+  const { t } = useI18n();
   const styles = makeStyles();
-  return <ScrollView style={styles.scroll} contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled" refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}><View style={styles.webPreviewFrame}><View style={styles.brandRow}><View style={styles.logoMark}><Ionicons name="analytics" size={20} color="#fff" /></View><View><Text style={styles.brand}>DigitalStep</Text><Text style={styles.brandSubtitle}>Marketing Manager for Small Businesses</Text></View></View><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></View></ScrollView>;
+  return <ScrollView style={styles.scroll} contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled" refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}><View style={styles.webPreviewFrame}><View style={styles.brandRow}><View style={styles.logoMark}><Ionicons name="analytics" size={20} color="#fff" /></View><View><Text style={styles.brand}>DigitalStep</Text><Text style={styles.brandSubtitle}>{t('common.brandSubtitle')}</Text></View></View><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></View></ScrollView>;
 }
 export function Card({ children, elevated }: { children: ReactNode; elevated?: boolean }) { useTheme(); const styles = makeStyles(); return <View style={[styles.card, elevated && styles.elevated]}>{children}</View>; }
 export function IconCircle({ name, color = colors.primary, background = colors.primarySoft, size = 18 }: { name: IconName; color?: string; background?: string; size?: number }) { useTheme(); const styles = makeStyles(); return <View style={[styles.iconCircle, { backgroundColor: background }]}><Ionicons name={name} size={size} color={color} /></View>; }
