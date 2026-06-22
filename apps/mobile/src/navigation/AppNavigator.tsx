@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../auth/AuthContext';
 import { colors, useTheme } from '../theme/theme';
-import { BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, TemplatesScreen, RegisterScreen, SettingsScreen, TasksScreen, WelcomeScreen } from '../screens/screens';
+import { AnalyticsScreen, BusinessOnboardingScreen, CalendarScreen, CampaignsScreen, HomeScreen, LoginScreen, PlannerScreen, RecommendationsScreen, TemplatesScreen, RegisterScreen, SettingsScreen, TasksScreen, WelcomeScreen } from '../screens/screens';
 
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
@@ -15,6 +15,7 @@ const tabIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   Planner: 'clipboard',
   Templates: 'library',
   Calendar: 'calendar',
+  Analytics: 'bar-chart',
   Campaigns: 'megaphone',
   Tips: 'bulb',
   Settings: 'settings'
@@ -37,6 +38,7 @@ function MainTabs() {
       <Tabs.Screen name="Planner" component={PlannerScreen} />
       <Tabs.Screen name="Templates" component={TemplatesScreen} />
       <Tabs.Screen name="Calendar" component={CalendarScreen} />
+      <Tabs.Screen name="Analytics" component={AnalyticsScreen} />
       <Tabs.Screen name="Campaigns" component={CampaignsScreen} />
       <Tabs.Screen name="Tips" component={RecommendationsScreen} />
       <Tabs.Screen name="Settings" component={SettingsScreen} />
