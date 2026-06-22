@@ -4,6 +4,7 @@ import cors from 'cors';
 import express, { type Request, type Response, type NextFunction, type RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './lib/prisma.js';
 
 const app = express();
@@ -348,7 +349,7 @@ app.post('/social-accounts', requireAuth, asyncHandler<AuthedRequest>(async (req
   if (!business) return;
   const input = socialAccountSchema.parse(req.body);
   const isPrimary = input.isPrimary || (await prisma.socialAccount.count({ where: { businessId: business.id } })) === 0;
-  const socialAccount = await prisma.$transaction(async (tx: typeof prisma) => {
+  const socialAccount = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
     return tx.socialAccount.create({ data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary, businessId: business.id } });
   });
@@ -359,7 +360,7 @@ app.put('/social-accounts/:id', requireAuth, asyncHandler<AuthedRequest>(async (
   const business = await requireFirstBusiness(req.userId!, res);
   if (!business) return;
   const input = socialAccountSchema.parse(req.body);
-  const socialAccount = await prisma.$transaction(async (tx: typeof prisma) => {
+  const socialAccount = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     if (input.isPrimary) await tx.socialAccount.updateMany({ where: { businessId: business.id }, data: { isPrimary: false } });
     return tx.socialAccount.update({ where: { id: req.params.id, businessId: business.id }, data: { platform: input.platform, username: input.username?.trim() || null, url: input.url?.trim() || null, isActive: input.isActive, isPrimary: input.isPrimary } });
   });
