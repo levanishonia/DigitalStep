@@ -44,7 +44,7 @@ export type GeneratedPlanContent = { id: string; day: string; title: string; des
 export type GeneratedWeeklyPlan = { industryTemplate: string; weekStart: string; weekEnd: string; focus: string; tasks: GeneratedPlanTask[]; contentItems: GeneratedPlanContent[] };
 export type WeeklyPlanResponse = { generatedPlan: GeneratedWeeklyPlan | null; tasks: Task[]; plannedPosts: ContentItem[]; campaigns: Campaign[]; missingActions: { id: string; title: string; description: string }[] };
 export type AcceptWeeklyPlanInput = { tasks: Omit<GeneratedPlanTask, 'id' | 'day'>[]; contentItems: Omit<GeneratedPlanContent, 'id' | 'day'>[] };
-export type StudioGenerateInput = { businessId: string; contentType: 'post' | 'story' | 'reel' | 'promotion' | 'announcement'; platform: 'facebook' | 'instagram' | 'website' | 'email'; goal: 'sales' | 'awareness' | 'engagement'; tone: 'professional' | 'friendly' | 'luxury' | 'funny'; language: Language };
+export type StudioGenerateInput = { businessId: string; businessType?: string; contentType: 'post' | 'story' | 'reel' | 'promotion' | 'announcement'; platform: 'facebook' | 'instagram' | 'website' | 'email'; goal: 'sales' | 'awareness' | 'engagement'; tone: 'professional' | 'friendly' | 'luxury' | 'funny'; language: Language };
 export type StudioGeneratedContent = { title: string; caption: string; cta: string; hashtags: string[]; visualIdea: string };
 
 export class ApiError extends Error {
