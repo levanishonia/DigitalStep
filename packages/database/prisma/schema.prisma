@@ -57,6 +57,7 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   businesses   Business[]
+  studioGenerations StudioGeneration[]
 }
 
 model Business {
@@ -74,6 +75,7 @@ model Business {
   tasks           Task[]
   campaigns       Campaign[]
   recommendations Recommendation[]
+  studioGenerations StudioGeneration[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -129,4 +131,20 @@ model Recommendation {
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+
+model StudioGeneration {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId  String
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contentType String
+  platform    String
+  language    String
+  createdAt   DateTime    @default(now())
+
+  @@index([userId, createdAt])
+  @@index([businessId, createdAt])
 }
