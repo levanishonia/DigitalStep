@@ -108,9 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     async updatePreferredLanguage(language) {
       if (!token) throw new Error('You must be logged in to update language.');
-      await setLanguage(language);
       const response = await updatePreferredLanguageRequest(language, token);
       setUser(response.user);
+      await setLanguage(response.user.preferredLanguage);
     },
     async completeBusinessOnboarding(input) {
       if (!token) throw new Error('You must be logged in to create a business.');
