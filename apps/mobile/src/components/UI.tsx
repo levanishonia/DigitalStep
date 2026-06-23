@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, useTheme } from '../theme/theme';
 import { useI18n } from '../i18n/i18n';
@@ -10,7 +10,7 @@ export function Screen({ children, title, subtitle, centered, refreshing, onRefr
   useTheme();
   const { t } = useI18n();
   const styles = makeStyles();
-  return <ScrollView style={styles.scroll} contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled" refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}><View style={styles.webPreviewFrame}><View style={styles.brandRow}><View style={styles.logoMark}><Ionicons name="analytics" size={20} color="#fff" /></View><View><Text style={styles.brand}>DigitalStep</Text><Text style={styles.brandSubtitle}>{t('common.brandSubtitle')}</Text></View></View><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></View></ScrollView>;
+  return <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView style={styles.scroll} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.screen, centered && styles.centered]} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'} refreshControl={onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}><View style={styles.webPreviewFrame}><View style={styles.brandRow}><View style={styles.logoMark}><Ionicons name="analytics" size={20} color="#fff" /></View><View><Text style={styles.brand}>DigitalStep</Text><Text style={styles.brandSubtitle}>{t('common.brandSubtitle')}</Text></View></View><Text style={styles.title}>{title}</Text>{subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}<View style={styles.stack}>{children}</View></View></ScrollView></KeyboardAvoidingView>;
 }
 export function Card({ children, elevated }: { children: ReactNode; elevated?: boolean }) { useTheme(); const styles = makeStyles(); return <View style={[styles.card, elevated && styles.elevated]}>{children}</View>; }
 export function IconCircle({ name, color = colors.primary, background = colors.primarySoft, size = 18 }: { name: IconName; color?: string; background?: string; size?: number }) { useTheme(); const styles = makeStyles(); return <View style={[styles.iconCircle, { backgroundColor: background }]}><Ionicons name={name} size={size} color={color} /></View>; }
@@ -26,8 +26,9 @@ export function Skeleton() { useTheme(); const styles = makeStyles(); return <Ca
 export function ErrorMessage({ message }: { message?: string }) { useTheme(); const styles = makeStyles(); return message ? <Text style={styles.error}>{message}</Text> : null; }
 
 const makeStyles = () => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1, backgroundColor: colors.background },
-  screen: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.md, paddingTop: 52, paddingBottom: 112, ...(Platform.OS === 'web' ? { alignItems: 'center' } : {}) },
+  screen: { flexGrow: 1, backgroundColor: colors.background, padding: spacing.md, paddingTop: Platform.OS === 'ios' ? 60 : 52, paddingBottom: 112, ...(Platform.OS === 'web' ? { alignItems: 'center' } : {}) },
   webPreviewFrame: { width: '100%', ...(Platform.OS === 'web' ? { maxWidth: 480 } : {}) },
   centered: { justifyContent: 'center' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
